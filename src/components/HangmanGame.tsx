@@ -49,21 +49,11 @@ export default function HangmanGame({ mode, onExit }: HangmanGameProps) {
       setLastWord(cachedData.word.toUpperCase());
       setLoading(false);
       triggerPrefetch(mode);
-
-      // Load image in background
-      if (!cachedData.imageUrl) {
-        import('../services/geminiService').then(({ generateAndStoreCharacterImage }) => {
-          generateAndStoreCharacterImage(cachedData.word, cachedData.characterName, cachedData.charDescription, cachedData.rarity)
-            .then(url => {
-              if (url) setWordData(prev => prev ? ({ ...prev, imageUrl: url }) : null);
-            });
-        });
-      }
     } else {
       setLoading(true);
       const timeout = setTimeout(() => setShowRetry(true), 8000);
       try {
-        const { generateWordData, generateAndStoreCharacterImage } = await import('../services/geminiService');
+        const { generateWordData } = await import('../services/geminiService');
         const data = await generateWordData(mode);
         const upperWord = data.word.toUpperCase();
         setWordData({ ...data, word: upperWord });
@@ -71,14 +61,6 @@ export default function HangmanGame({ mode, onExit }: HangmanGameProps) {
         setLoading(false);
         clearTimeout(timeout);
         triggerPrefetch(mode);
-
-        // Load image in background
-        if (!data.imageUrl) {
-          generateAndStoreCharacterImage(data.word, data.characterName, data.charDescription, data.rarity)
-            .then(url => {
-              if (url) setWordData(prev => prev ? ({ ...prev, imageUrl: url }) : null);
-            });
-        }
       } catch (err) {
         console.error("단어를 불러오지 못했습니다", err);
         setLoading(false);
@@ -136,9 +118,9 @@ export default function HangmanGame({ mode, onExit }: HangmanGameProps) {
 
     const shinyBase = 0.01;
     const isShiny = Math.random() < (shinyBase * (captureRate / 100));
-    
+
     const char: GameCharacter = {
-      id: wordData.word.toLowerCase(), // Use word as ID for stacking duplicates
+      id: wordData.word.toLowerCase(),
       characterId: wordData.word.toLowerCase(),
       name: wordData.characterName,
       rarity: wordData.rarity,
@@ -149,20 +131,38 @@ export default function HangmanGame({ mode, onExit }: HangmanGameProps) {
       visualEmoji: wordData.visualEmoji,
       category: wordData.category,
       description: wordData.charDescription,
-      imageUrl: wordData.imageUrl,
+      imageUrl: wordData.imageUrl || "",
       isShiny
     };
 
     const rarities: Record<Rarity, number> = {
       'Common': 10, 'Uncommon': 25, 'Rare': 50, 'Unique': 100, 'Epic': 200, 'Legendary': 500
     };
-    
+
     const expBonus = Math.floor(rarities[char.rarity] * (captureRate / 100));
     const coinBonus = char.rarity === 'Common' ? 5 : 20;
 
     await updateProgress(expBonus, coinBonus);
     await addCharacterToCollection(char);
     setShowReward(true);
+
+    // Generate image after capture (always — all rarities get art)
+    if (!char.imageUrl) {
+      const { generateAndStoreCharacterImage } = await import('../services/geminiService');
+      generateAndStoreCharacterImage(
+        wordData.word,
+        wordData.characterName,
+        wordData.charDescription,
+        wordData.rarity,
+        (wordData as any).visualKeywords || wordData.visualEmoji,
+        wordData.wordKorean,
+      ).then(url => {
+        if (url) {
+          setWordData((prev: GeneratedWord | null) => prev ? { ...prev, imageUrl: url } : null);
+          addCharacterToCollection({ ...char, imageUrl: url });
+        }
+      });
+    }
   };
 
   if (loading) {
