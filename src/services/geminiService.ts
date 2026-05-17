@@ -2,7 +2,7 @@ import { GoogleGenAI, Type } from "@google/genai";
 import { Rarity } from "../types";
 import { db, storage } from "../lib/firebase";
 import { doc, getDoc, setDoc, serverTimestamp } from "firebase/firestore";
-import { ref, uploadString, getDownloadURL } from "firebase/storage";
+import { ref, uploadString, getDownloadURL, uploadBytes } from "firebase/storage";
 
 const ai = new GoogleGenAI({ apiKey: process.env.GEMINI_API_KEY });
 
@@ -256,24 +256,30 @@ export async function generateAndStoreCharacterImage(
     const base64Data = await callWithRetry(generateImgData);
 
     if (base64Data) {
-      console.log(`[Nexus] Processing image data for upload... Type: ${typeof base64Data}`);
+      console.log(`[Nexus] Processing image data for upload... Type: ${typeof base64Data} (${typeof base64Data === 'string' ? base64Data.length : base64Data.length} units)`);
       // 2. Upload to Firebase Storage
-      let base64String: string;
+      console.log(`[Nexus] Uploading to Firebase Storage: characters/${word.toUpperCase()}.png`);
       
-      if (typeof base64Data === 'string') {
-        base64String = base64Data;
-      } else {
-        // Handle Uint8Array for browser (Imagen/imageBytes)
-        console.log(`[Nexus] Converting image bytes to base64...`);
-        const bytes = base64Data as Uint8Array;
-        const binary = Array.from(bytes).map(b => String.fromCharCode(b)).join('');
-        base64String = btoa(binary);
+      const uploadStartTime = Date.now();
+      try {
+        if (typeof base64Data !== 'string') {
+          // Use uploadBytes for binary data (Uint8Array)
+          console.log(`[Nexus] Binary data detected. Using uploadBytes... Size: ${base64Data.length} bytes`);
+          await uploadBytes(storageRef, base64Data as Uint8Array, { contentType: 'image/png' });
+        } else {
+          // Use uploadString for base64
+          console.log(`[Nexus] Base64 string detected. Using uploadString... Length: ${base64Data.length}`);
+          await uploadString(storageRef, base64Data, 'base64', { contentType: 'image/png' });
+        }
+        console.log(`[Nexus] Firebase Storage upload completed in ${Date.now() - uploadStartTime}ms`);
+      } catch (uploadErr: any) {
+        console.error(`[Nexus] Firebase Storage upload FAILED:`, uploadErr);
+        throw uploadErr;
       }
 
-      console.log(`[Nexus] Uploading to Firebase Storage: characters/${word.toUpperCase()}.png`);
-      await uploadString(storageRef, base64String, 'base64', { contentType: 'image/png' });
+      console.log(`[Nexus] Fetching download URL...`);
       const downloadUrl = await getDownloadURL(storageRef);
-      console.log(`[Nexus] Upload success. Download URL obtained: ${downloadUrl.substring(0, 50)}...`);
+      console.log(`[Nexus] Upload success. Download URL: ${downloadUrl.split('?')[0]}...`);
 
       // 3. Update Firestore Vault
       try {
