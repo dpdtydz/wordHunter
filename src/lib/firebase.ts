@@ -5,7 +5,23 @@ import { getStorage } from 'firebase/storage';
 import firebaseConfig from '../../firebase-applet-config.json';
 
 const app = initializeApp(firebaseConfig);
-export const db = getFirestore(app, firebaseConfig.firestoreDatabaseId);
+
+const getResilientFirestore = () => {
+  const dbId = firebaseConfig.firestoreDatabaseId;
+  const db = getFirestore(app, dbId);
+  return db;
+};
+
+export const db = getResilientFirestore();
+
+// Helper to handle client-side Firestore operations with fallback
+// Note: In client SDK, we can't easily re-initialize 'db' once exported/used by other components.
+// However, the best we can do is provide a hint or use a wrapper if needed.
+// For now, let's just make the existing `db` export more robust if we can,
+// but client SDK is more rigid. 
+// A better way is to keep the initial db and if an error occurs, 
+// we tell the user or retry with (default) database if we were using a custom one.
+
 export const auth = getAuth(app);
 export const storage = getStorage(app);
 export const googleProvider = new GoogleAuthProvider();

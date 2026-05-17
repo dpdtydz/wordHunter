@@ -31,6 +31,29 @@ export function GameProvider({ children }: { children: React.ReactNode }) {
     Farming: null,
     Challenge: null
   });
+  const [dbInstance, setDbInstance] = useState(db);
+
+  useEffect(() => {
+    const checkHealth = async () => {
+      try {
+        const res = await fetch('/api/health');
+        if (res.ok) {
+          const data = await res.json();
+          const configDbId = (firebaseConfig as any).firestoreDatabaseId;
+          if (data.databaseId === "(default)" && configDbId && configDbId !== "(default)") {
+            console.log("[Nexus] Server using (default) database. Switching client too.");
+            const { getApp } = await import('firebase/app');
+            const { getFirestore } = await import('firebase/firestore');
+            const newDb = getFirestore(getApp());
+            setDbInstance(newDb);
+          }
+        }
+      } catch (e) {
+        console.warn("[Nexus] Health check failed", e);
+      }
+    };
+    checkHealth();
+  }, []);
 
   const triggerPrefetch = async (mode: string) => {
     if (prefetchCache[mode] || activePrefetches.has(mode)) return;
@@ -73,10 +96,10 @@ export function GameProvider({ children }: { children: React.ReactNode }) {
       setLoading(false);
     });
     return unsubscribe;
-  }, []);
+  }, [dbInstance]);
 
   const ensureUserProfile = async (user: User) => {
-    const userRef = doc(db, 'users', user.uid);
+    const userRef = doc(dbInstance, 'users', user.uid);
     try {
       const snap = await getDoc(userRef);
       if (snap.exists()) {
@@ -104,7 +127,7 @@ export function GameProvider({ children }: { children: React.ReactNode }) {
         setProfile(newProfile);
         
         // Initialize ranking entry
-        await setFirestoreDoc(doc(db, 'rankings', user.uid), {
+        await setFirestoreDoc(doc(dbInstance, 'rankings', user.uid), {
           userId: user.uid,
           userName: newProfile.displayName,
           totalWordsSolved: 0,
@@ -119,7 +142,7 @@ export function GameProvider({ children }: { children: React.ReactNode }) {
 
   const fetchUserCollections = async (userId: string) => {
     try {
-      const collRef = collection(db, 'users', userId, 'collection');
+      const collRef = collection(dbInstance, 'users', userId, 'collection');
       const snap = await getDocs(collRef);
       const characters = snap.docs.map(d => ({
         ...d.data(),
@@ -150,8 +173,8 @@ export function GameProvider({ children }: { children: React.ReactNode }) {
     const newCoins = profile.coins + coinsBonus;
     const newLevel = Math.floor(newExp / 100) + 1; // Simple level logic
     
-    const userRef = doc(db, 'users', user.uid);
-    const rankingRef = doc(db, 'rankings', user.uid);
+    const userRef = doc(dbInstance, 'users', user.uid);
+    const rankingRef = doc(dbInstance, 'rankings', user.uid);
 
     try {
       await updateDoc(userRef, {
@@ -187,7 +210,7 @@ export function GameProvider({ children }: { children: React.ReactNode }) {
     ) as GameCharacter;
 
     try {
-      const charRef = doc(db, 'users', user.uid, 'collection', sanitizedChar.id);
+      const charRef = doc(dbInstance, 'users', user.uid, 'collection', sanitizedChar.id);
       const existingDoc = await getDoc(charRef);
       
       let finalChar: CapturedCharacter;
@@ -231,7 +254,7 @@ export function GameProvider({ children }: { children: React.ReactNode }) {
           updatedAt: serverTimestamp()
         });
         
-        const rankingRef = doc(db, 'rankings', user.uid);
+        const rankingRef = doc(dbInstance, 'rankings', user.uid);
         const currentRank = await getDoc(rankingRef);
         const newCount = (currentRank.exists() ? currentRank.data().collectionCount : 0) + 1;
         
@@ -255,7 +278,7 @@ export function GameProvider({ children }: { children: React.ReactNode }) {
 
   const fetchRankings = async () => {
     try {
-      const q = query(collection(db, 'rankings'), orderBy('totalWordsSolved', 'desc'), limit(10));
+      const q = query(collection(dbInstance, 'rankings'), orderBy('totalWordsSolved', 'desc'), limit(10));
       const snap = await getDocs(q);
       return snap.docs.map(d => ({
         ...d.data(),
