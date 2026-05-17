@@ -1,0 +1,6 @@
+{
+  "name": "RPG Quiz: Word Hunter",
+  "description": "An AI-powered word-guessing RPG where words manifest as collectible characters. Manifest unique heroes, complete your collection, and compete in global rankings.",
+  "requestFramePermissions": [],
+  "majorCapabilities": ["MAJOR_CAPABILITY_SERVER_SIDE_GEMINI_API"]
+}

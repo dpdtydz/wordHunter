@@ -1,0 +1,75 @@
+{
+  "entities": {
+    "User": {
+      "title": "User",
+      "description": "User profile information",
+      "type": "object",
+      "properties": {
+        "uid": { "type": "string" },
+        "displayName": { "type": "string" },
+        "experience": { "type": "integer" },
+        "level": { "type": "integer" },
+        "coins": { "type": "integer" },
+        "createdAt": { "type": "string", "format": "date-time" },
+        "updatedAt": { "type": "string", "format": "date-time" }
+      },
+      "required": ["uid", "displayName", "createdAt"]
+    },
+    "CapturedCharacter": {
+      "title": "Captured Character",
+      "description": "A character collected by a user",
+      "type": "object",
+      "properties": {
+        "id": { "type": "string" },
+        "characterId": { "type": "string" },
+        "name": { "type": "string" },
+        "rarity": { "type": "string", "enum": ["Common", "Uncommon", "Rare", "Unique", "Epic", "Legendary"] },
+        "word": { "type": "string" },
+        "wordKorean": { "type": "string" },
+        "wordDefinition": { "type": "string" },
+        "wordHint": { "type": "string" },
+        "category": { "type": "string", "enum": ["생명체", "유물", "현상", "공간", "추상", "상황", "관계"] },
+        "description": { "type": "string" },
+        "visualEmoji": { "type": "string" },
+        "imageUrl": { "type": "string" },
+        "isShiny": { "type": "boolean" },
+        "capturedAt": { "type": "string", "format": "date-time" },
+        "updatedAt": { "type": "string", "format": "date-time" },
+        "count": { "type": "integer" },
+        "level": { "type": "integer" }
+      },
+      "required": ["id", "characterId", "name", "rarity", "word", "wordKorean", "category", "description", "capturedAt", "count", "level"]
+    },
+    "Ranking": {
+      "title": "Ranking",
+      "description": "User placement in various leaderboards",
+      "type": "object",
+      "properties": {
+        "userId": { "type": "string" },
+        "userName": { "type": "string" },
+        "totalWordsSolved": { "type": "integer" },
+        "collectionCount": { "type": "integer" },
+        "lastUpdatedAt": { "type": "string", "format": "date-time" }
+      },
+      "required": ["userId", "userName", "totalWordsSolved", "collectionCount"]
+    }
+  },
+  "firestore": {
+    "/users/{userId}": {
+      "schema": "User",
+      "description": "User profiles"
+    },
+    "/users/{userId}/collection/{charId}": {
+      "schema": "CapturedCharacter",
+      "description": "Characters collected by a specific user"
+    },
+    "/rankings/{userId}": {
+      "schema": "Ranking",
+      "description": "Leaderboard data"
+    },
+    "/global_vault/{word}": {
+      "schema": "CapturedCharacter",
+      "description": "Master archive of manifested characters per word"
+    }
+  }
+}
