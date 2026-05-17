@@ -35,13 +35,3 @@
 .glass-card {
   @apply bg-white/5 backdrop-blur-md border border-white/10 rounded-2xl;
 }
-
-@keyframes shimmer {
-  0%   { transform: translateX(-100%); }
-  100% { transform: translateX(100%); }
-}
-
-@keyframes spin-slow {
-  from { transform: rotate(0deg); }
-  to   { transform: rotate(360deg); }
-}
