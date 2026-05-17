@@ -1,34 +1,85 @@
 import React, { useState } from 'react';
 import { motion, AnimatePresence } from 'motion/react';
 import { useGame } from '../context/GameContext';
-import { Rarity, CapturedCharacter, GameCharacter } from '../types';
-import { Search, Grid, Info, X, RefreshCw, Wand2 } from 'lucide-react';
+import { CapturedCharacter, GameCharacter } from '../types';
+import { Search, Info, X, RefreshCw, Wand2, Sparkles, BookOpen } from 'lucide-react';
 import { cn } from '../lib/utils';
 import { getRarityBg, getRarityBorder, getRarityColor } from '../lib/gameUtils';
-import { generateWordData } from '../services/geminiService';
 
 interface CollectionProps {
   onBack: () => void;
 }
 
+// ─── Shimmer skeleton shown while the image URL loads ───────────────────────
+function CardShimmer() {
+  return (
+    <div className="absolute inset-0 z-10 overflow-hidden bg-brand-gray/60">
+      <div className="absolute inset-0 -translate-x-full animate-[shimmer_1.6s_infinite] bg-gradient-to-r from-transparent via-white/8 to-transparent" />
+    </div>
+  );
+}
+
+// ─── Fallback art when no imageUrl is available ───────────────────────────
+function CardArtFallback({ char }: { char: CapturedCharacter }) {
+  const keywords = ((char as any).visualKeywords || char.visualEmoji || '')
+    .split(' / ')
+    .filter(Boolean)
+    .slice(0, 3);
+
+  return (
+    <div className="absolute inset-0 flex flex-col items-center justify-center p-4 select-none">
+      {/* Word as the hero visual element */}
+      <p className="text-[10px] font-mono text-white/30 uppercase tracking-[0.3em] mb-2">
+        {char.category}
+      </p>
+      <div className={cn(
+        'text-2xl font-black tracking-widest text-center leading-tight mb-3 drop-shadow-lg',
+        getRarityColor(char.rarity),
+      )}>
+        {char.word.toUpperCase()}
+      </div>
+      <div className="text-[11px] text-gray-400 mb-4 font-medium">{char.wordKorean}</div>
+
+      {/* Visual keyword chips */}
+      {keywords.length > 0 && (
+        <div className="flex flex-col items-center gap-1 w-full">
+          {keywords.map((kw: string, i: number) => (
+            <span
+              key={i}
+              className="text-[8px] px-2 py-0.5 rounded-full bg-white/5 border border-white/10 text-gray-500 font-mono truncate max-w-full"
+            >
+              {kw.trim()}
+            </span>
+          ))}
+        </div>
+      )}
+
+      {/* Subtle "image pending" indicator */}
+      <div className="absolute bottom-3 right-3 flex items-center gap-1 opacity-40">
+        <RefreshCw size={8} className="text-gray-500 animate-spin" style={{ animationDuration: '3s' }} />
+      </div>
+    </div>
+  );
+}
+
 export default function Collection({ onBack }: CollectionProps) {
   const { collection: userChars, addCharacterToCollection } = useGame();
-  const [filter, setFilter] = useState<string>("");
+  const [filter, setFilter] = useState('');
   const [selectedChar, setSelectedChar] = useState<CapturedCharacter | null>(null);
   const [reManifesting, setReManifesting] = useState(false);
-  const [imgError, setImgError] = useState(false);
+  const [modalImgLoaded, setModalImgLoaded] = useState(false);
+  const [modalImgError, setModalImgError] = useState(false);
 
-  // Reset img error when selected character changes
   React.useEffect(() => {
-    setImgError(false);
+    setModalImgLoaded(false);
+    setModalImgError(false);
   }, [selectedChar?.id]);
 
   const handleReManifest = async (char: CapturedCharacter) => {
     setReManifesting(true);
     try {
       const { generateWordData, generateAndStoreCharacterImage } = await import('../services/geminiService');
-      
-      // 1. Fetch text data first (FAST)
+
       const data = await generateWordData('Farming', char.word, true);
       const textOnlyChar: GameCharacter = {
         id: char.id,
@@ -39,61 +90,69 @@ export default function Collection({ onBack }: CollectionProps) {
         wordKorean: data.wordKorean,
         wordDefinition: data.wordDefinition,
         wordHint: data.wordHint,
-        visualEmoji: data.visualEmoji,
+        visualEmoji: (data as any).visualKeywords || data.visualEmoji,
         category: data.category,
         description: data.charDescription,
-        imageUrl: char.imageUrl || "", // Use empty string instead of undefined
-        isShiny: char.isShiny || false
+        imageUrl: '',
+        isShiny: char.isShiny || false,
       };
-      
-      // Show text changes immediately
-      const tempChar = { ...char, ...textOnlyChar } as CapturedCharacter;
-      setSelectedChar(tempChar);
+
+      setSelectedChar({ ...char, ...textOnlyChar } as CapturedCharacter);
+      setModalImgLoaded(false);
       await addCharacterToCollection(textOnlyChar);
-      
-      // 2. Fetch/Generate image in background (SLOW)
-      const newImageUrl = await generateAndStoreCharacterImage(char.word, data.characterName, data.charDescription, data.rarity, true);
+
+      const newImageUrl = await generateAndStoreCharacterImage(
+        char.word,
+        data.characterName,
+        data.charDescription,
+        data.rarity,
+        (data as any).visualKeywords || data.visualEmoji,
+        data.wordKorean,
+        true,
+      );
       if (newImageUrl) {
-        const finalCharData = { ...textOnlyChar, imageUrl: newImageUrl };
-        await addCharacterToCollection(finalCharData);
-        setSelectedChar(prev => prev ? ({ ...prev, imageUrl: newImageUrl }) : null);
+        const final = { ...textOnlyChar, imageUrl: newImageUrl };
+        await addCharacterToCollection(final);
+        setSelectedChar(prev => prev ? { ...prev, imageUrl: newImageUrl } : null);
       }
     } catch (err) {
-      console.error("Re-manifest failed", err);
+      console.error('Re-manifest failed', err);
     } finally {
       setReManifesting(false);
     }
   };
 
   const filteredCollection = userChars.filter(char => {
-    const nameMatch = char.name?.toLowerCase().includes((filter || "").toLowerCase());
-    const wordMatch = char.word?.toLowerCase().includes((filter || "").toLowerCase());
-    return nameMatch || wordMatch;
+    const q = (filter || '').toLowerCase();
+    return char.name?.toLowerCase().includes(q) || char.word?.toLowerCase().includes(q);
   });
 
   return (
     <div className="max-w-6xl mx-auto py-8 px-4">
+      {/* Header */}
       <header className="flex flex-col md:flex-row justify-between items-start md:items-center gap-4 mb-8">
         <div>
           <button onClick={onBack} className="text-gray-500 hover:text-white transition-colors text-sm mb-2 flex items-center gap-1">
             ← 캠프로 돌아가기
           </button>
           <h1 className="text-4xl font-bold neon-glow">개체 도감</h1>
-          <p className="text-gray-400 font-mono text-sm tracking-widest">{userChars.length}마리의 존재 포획됨</p>
+          <p className="text-gray-400 font-mono text-sm tracking-widest">
+            {userChars.length}마리의 존재 포획됨
+          </p>
         </div>
-
         <div className="relative w-full md:w-64">
           <Search className="absolute left-3 top-1/2 -translate-y-1/2 text-gray-500" size={18} />
-          <input 
-            type="text" 
+          <input
+            type="text"
             placeholder="이름이나 단어로 검색..."
             value={filter}
-            onChange={(e) => setFilter(e.target.value)}
+            onChange={(e: React.ChangeEvent<HTMLInputElement>) => setFilter(e.target.value)}
             className="w-full bg-brand-gray border border-white/10 rounded-full py-2 pl-10 pr-4 focus:border-brand-purple outline-none transition-all"
           />
         </div>
       </header>
 
+      {/* Card grid */}
       {userChars.length === 0 ? (
         <div className="text-center py-20 glass-card bg-brand-dark/80 border-white/10">
           <Info className="mx-auto text-gray-500 mb-4" size={48} />
@@ -106,120 +165,158 @@ export default function Collection({ onBack }: CollectionProps) {
       ) : (
         <div className="grid grid-cols-2 sm:grid-cols-3 lg:grid-cols-4 xl:grid-cols-5 gap-4">
           {filteredCollection.map((char, i) => (
-            <CharacterCard 
-              key={char.id} 
-              char={char} 
-              onClick={() => setSelectedChar(char)} 
-              index={i} 
+            <CharacterCard
+              key={char.id}
+              char={char}
+              onClick={() => setSelectedChar(char)}
+              index={i}
             />
           ))}
         </div>
       )}
 
-      {/* Details Modal */}
+      {/* Detail modal */}
       <AnimatePresence>
         {selectedChar && (
           <motion.div
             initial={{ opacity: 0 }}
             animate={{ opacity: 1 }}
             exit={{ opacity: 0 }}
-            className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-brand-dark/95 backdrop-blur-lg"
+            className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-brand-dark/95 backdrop-blur-xl"
+            onClick={() => setSelectedChar(null)}
           >
             <motion.div
-              initial={{ scale: 0.9, y: 20 }}
+              initial={{ scale: 0.92, y: 24 }}
               animate={{ scale: 1, y: 0 }}
-              className="glass-card bg-brand-dark/95 max-w-2xl w-full p-8 relative overflow-hidden border border-white/20 shadow-2xl"
+              exit={{ scale: 0.92, y: 24 }}
+              transition={{ type: 'spring', damping: 22, stiffness: 320 }}
+              onClick={e => e.stopPropagation()}
+              className={cn(
+                'relative w-full max-w-2xl rounded-3xl overflow-hidden border shadow-2xl bg-[#0d0d10]',
+                getRarityBorder(selectedChar.rarity),
+              )}
             >
-              <button 
+              {/* Top rarity bar */}
+              <div className={cn('h-1 w-full', getRarityBg(selectedChar.rarity))} />
+
+              <button
                 onClick={() => setSelectedChar(null)}
-                className="absolute top-4 right-4 text-gray-500 hover:text-white"
+                className="absolute top-4 right-4 z-30 p-1 rounded-full bg-black/50 text-gray-400 hover:text-white transition-colors"
               >
-                <X size={24} />
+                <X size={20} />
               </button>
 
-              <div className="grid grid-cols-1 md:grid-cols-2 gap-8">
-                <div className={cn("aspect-square rounded-2xl flex items-center justify-center border relative group overflow-hidden bg-brand-dark", getRarityBorder(selectedChar.rarity))}>
-                  <div className={cn("absolute inset-0 opacity-20 blur-3xl rounded-full", getRarityBg(selectedChar.rarity))} />
-                  {selectedChar.imageUrl && !imgError ? (
-                    <img 
-                      src={selectedChar.imageUrl} 
-                      alt={selectedChar.name} 
-                      className="w-full h-full object-cover relative z-10 transition-transform duration-700 group-hover:scale-110"
-                      referrerPolicy="no-referrer"
-                      onError={() => setImgError(true)}
-                    />
+              <div className="grid grid-cols-1 md:grid-cols-2">
+                {/* Art panel */}
+                <div className="relative min-h-[320px] md:min-h-[480px] bg-black/40 overflow-hidden flex items-center justify-center">
+                  <div className={cn('absolute inset-0 opacity-15 blur-3xl scale-75', getRarityBg(selectedChar.rarity))} />
+
+                  {selectedChar.imageUrl && !modalImgError ? (
+                    <>
+                      {!modalImgLoaded && (
+                        <div className="absolute inset-0 bg-brand-gray/60 overflow-hidden">
+                          <div className="absolute inset-0 -translate-x-full animate-[shimmer_1.6s_infinite] bg-gradient-to-r from-transparent via-white/8 to-transparent" />
+                        </div>
+                      )}
+                      <motion.img
+                        src={selectedChar.imageUrl}
+                        alt={selectedChar.name}
+                        referrerPolicy="no-referrer"
+                        onLoad={() => setModalImgLoaded(true)}
+                        onError={() => setModalImgError(true)}
+                        initial={{ opacity: 0 }}
+                        animate={{ opacity: modalImgLoaded ? 1 : 0 }}
+                        transition={{ duration: 0.6 }}
+                        className="w-full h-full object-cover absolute inset-0"
+                      />
+                    </>
                   ) : (
-                    <motion.div 
-                      animate={['Unique', 'Epic', 'Legendary'].includes(selectedChar.rarity) ? { 
-                        scale: [1, 1.1, 1],
-                        rotate: [0, 5, -5, 0]
-                      } : {}}
-                      transition={{ duration: 5, repeat: Infinity }}
-                      className="text-8xl relative z-10 select-none group-hover:scale-110 transition-transform duration-700"
-                    >
-                      {selectedChar.visualEmoji || charToIcon(selectedChar.category)}
-                    </motion.div>
+                    <ModalArtFallback char={selectedChar} />
                   )}
+
+                  {/* Rarity badge overlay */}
+                  <div className="absolute top-4 left-4 z-10">
+                    <span className={cn(
+                      'text-[10px] font-mono font-black tracking-[0.3em] px-3 py-1 rounded-full bg-black/70 border border-white/10 backdrop-blur-sm uppercase',
+                      getRarityColor(selectedChar.rarity),
+                    )}>
+                      {selectedChar.rarity}
+                    </span>
+                  </div>
+
+                  {/* Shiny overlay */}
                   {selectedChar.isShiny && (
-                    <div className="absolute inset-0 bg-[radial-gradient(circle_at_center,rgba(255,255,255,0.1),transparent)] animate-pulse z-20 pointer-events-none" />
+                    <div className="absolute inset-0 bg-[radial-gradient(circle_at_30%_30%,rgba(255,255,255,0.08),transparent_60%)] pointer-events-none z-20 animate-pulse" />
                   )}
-                  <div className="absolute bottom-4 left-4 font-mono text-[10px] text-white/50 z-20 bg-black/40 px-2 rounded backdrop-blur-sm">ID: {selectedChar.id}</div>
+
+                  {/* Bottom gradient for text legibility */}
+                  <div className="absolute bottom-0 inset-x-0 h-24 bg-gradient-to-t from-black/80 to-transparent z-10 pointer-events-none" />
+                  <div className="absolute bottom-4 left-4 z-20">
+                    <p className="text-[9px] font-mono text-white/40">ID: {selectedChar.id}</p>
+                  </div>
                 </div>
 
-                <div className="flex flex-col">
-                  <div className="flex justify-between items-start mb-2">
-                    <div className={cn("text-sm font-mono tracking-[0.2em]", getRarityColor(selectedChar.rarity))}>
-                      {selectedChar.rarity} 개체
-                    </div>
-                    <div className="px-2 py-1 bg-white/10 rounded flex items-center gap-1">
-                      <span className="text-[10px] text-gray-400 font-mono">COUNT</span>
-                      <span className="text-sm font-bold text-white">x{selectedChar.count || 1}</span>
-                    </div>
+                {/* Info panel */}
+                <div className="flex flex-col p-6 bg-[#0d0d10]">
+                  <div className="flex justify-between items-center mb-1">
+                    <span className={cn('text-[10px] font-mono tracking-[0.25em] uppercase', getRarityColor(selectedChar.rarity))}>
+                      {selectedChar.category} 개체
+                    </span>
+                    <span className="px-2 py-0.5 bg-white/8 rounded text-[10px] font-mono text-gray-400">
+                      x{selectedChar.count || 1} 보유
+                    </span>
                   </div>
-                  <h2 className="text-4xl font-bold mb-4">{selectedChar.name}</h2>
-                  
-                  <div className="space-y-4 flex-1">
-                    <div className="p-4 bg-white/5 rounded-xl border border-white/5">
-                      <p className="text-xs text-gray-500 uppercase mb-1">관련 단어</p>
-                      <p className="text-2xl font-bold tracking-widest text-brand-cyan mb-2">
-                        {selectedChar.word.toUpperCase()} <span className="text-sm font-normal text-gray-400">({selectedChar.wordKorean})</span>
-                      </p>
-                      <p className="text-[10px] text-gray-400 leading-tight mb-2">
-                        {selectedChar.wordDefinition}
-                      </p>
-                      <div className="p-2 bg-brand-cyan/5 border border-brand-cyan/10 rounded-lg">
-                        <p className="text-[9px] text-brand-cyan uppercase font-mono mb-0.5">분석 힌트</p>
-                        <p className="text-[11px] text-gray-300 italic">{selectedChar.wordHint}</p>
+
+                  <h2 className="text-3xl font-black mb-1 leading-tight">{selectedChar.name}</h2>
+                  <p className="text-[10px] font-mono text-gray-600 mb-4">LV.{selectedChar.level || 1}</p>
+
+                  {/* Word info */}
+                  <div className="rounded-2xl bg-white/4 border border-white/8 p-4 mb-4">
+                    <div className="flex items-center gap-2 mb-2">
+                      <BookOpen size={12} className="text-brand-cyan" />
+                      <span className="text-[9px] font-mono text-brand-cyan uppercase tracking-widest">관련 단어</span>
+                    </div>
+                    <p className="text-xl font-black tracking-widest text-brand-cyan">
+                      {selectedChar.word.toUpperCase()}
+                      <span className="text-sm font-normal text-gray-400 ml-2 tracking-normal">
+                        {selectedChar.wordKorean}
+                      </span>
+                    </p>
+                    <p className="text-[10px] text-gray-500 mt-2 leading-relaxed">
+                      {selectedChar.wordDefinition}
+                    </p>
+                    {selectedChar.wordHint && (
+                      <div className="mt-2 p-2 bg-brand-cyan/5 border border-brand-cyan/10 rounded-lg">
+                        <p className="text-[8px] text-brand-cyan/60 uppercase font-mono mb-0.5">힌트</p>
+                        <p className="text-[10px] text-gray-400 italic">{selectedChar.wordHint}</p>
                       </div>
-                    </div>
-
-                    <div>
-                      <p className="text-xs text-gray-500 uppercase mb-1">설명 및 배경서사</p>
-                      <p className="text-gray-300 italic leading-relaxed text-sm">{selectedChar.description}</p>
-                    </div>
+                    )}
                   </div>
 
-                  <div className="mt-8 pt-8 border-t border-white/10 flex flex-col sm:flex-row justify-between items-center gap-4">
-                    <div className="flex flex-col text-xs text-gray-500 font-mono">
-                      <span>{selectedChar.capturedAt.toLocaleDateString()} 포획됨</span>
+                  {/* Lore */}
+                  <div className="flex-1 mb-4">
+                    <p className="text-[9px] font-mono text-gray-600 uppercase tracking-widest mb-2">배경 서사</p>
+                    <p className="text-gray-300 text-sm leading-relaxed italic">{selectedChar.description}</p>
+                  </div>
+
+                  <div className="pt-4 border-t border-white/8 flex flex-col sm:flex-row justify-between items-center gap-3">
+                    <p className="text-[10px] text-gray-600 font-mono">
+                      {selectedChar.capturedAt.toLocaleDateString()} 포획
                       {selectedChar.isShiny && (
-                        <span className="flex items-center gap-1 text-yellow-400 mt-1">
-                          <Grid size={12} /> 특별한 색상
+                        <span className="ml-2 text-yellow-400">
+                          <Sparkles size={10} className="inline" /> 특별한 색상
                         </span>
                       )}
-                    </div>
-                    
+                    </p>
                     <button
                       onClick={() => handleReManifest(selectedChar)}
                       disabled={reManifesting}
-                      className="flex items-center gap-2 bg-brand-purple/20 hover:bg-brand-purple/40 border border-brand-purple/50 px-4 py-2 rounded-xl text-brand-purple text-xs font-black transition-all group/btn disabled:opacity-50"
+                      className="flex items-center gap-2 bg-brand-purple/15 hover:bg-brand-purple/35 border border-brand-purple/40 px-4 py-2 rounded-xl text-brand-purple text-xs font-black transition-all group/btn disabled:opacity-40 whitespace-nowrap"
                     >
-                      {reManifesting ? (
-                        <RefreshCw size={14} className="animate-spin" />
-                      ) : (
-                        <Wand2 size={14} className="group-hover/btn:rotate-12 transition-transform" />
-                      )}
-                      {reManifesting ? "차원 재공명 중..." : "넥서스 재실체화 (UI 업그레이드)"}
+                      {reManifesting
+                        ? <RefreshCw size={13} className="animate-spin" />
+                        : <Wand2 size={13} className="group-hover/btn:rotate-12 transition-transform" />}
+                      {reManifesting ? '재실체화 중...' : '넥서스 재실체화'}
                     </button>
                   </div>
                 </div>
@@ -232,103 +329,141 @@ export default function Collection({ onBack }: CollectionProps) {
   );
 }
 
+// ─── Detail modal fallback art ────────────────────────────────────────────────
+function ModalArtFallback({ char }: { char: CapturedCharacter }) {
+  const keywords = ((char as any).visualKeywords || char.visualEmoji || '')
+    .split(' / ')
+    .filter(Boolean);
+
+  return (
+    <div className="relative z-10 flex flex-col items-center justify-center w-full h-full p-8 text-center">
+      <p className={cn('text-6xl font-black tracking-widest mb-3', getRarityColor(char.rarity))}>
+        {char.word.toUpperCase()}
+      </p>
+      <p className="text-gray-500 text-base mb-6">{char.wordKorean}</p>
+      {keywords.length > 0 && (
+        <div className="flex flex-wrap gap-2 justify-center">
+          {keywords.map((kw: string, i: number) => (
+            <span key={i} className="text-[10px] px-3 py-1 rounded-full bg-white/5 border border-white/10 text-gray-500 font-mono">
+              {kw.trim()}
+            </span>
+          ))}
+        </div>
+      )}
+      <div className="mt-6 flex items-center gap-2 text-gray-600 text-[10px] font-mono">
+        <RefreshCw size={10} className="animate-spin" style={{ animationDuration: '3s' }} />
+        이미지 생성 중
+      </div>
+    </div>
+  );
+}
+
+// ─── Collection card ──────────────────────────────────────────────────────────
 interface CharacterCardProps {
   char: CapturedCharacter;
   onClick: () => void;
   index: number;
-  key?: string | number;
+  key?: React.Key;
 }
 
 function CharacterCard({ char, onClick, index }: CharacterCardProps) {
   const isHighRarity = ['Unique', 'Epic', 'Legendary'].includes(char.rarity);
-  const [localImgError, setLocalImgError] = useState(false);
-  
+  const [imgLoaded, setImgLoaded] = useState(false);
+  const [imgError, setImgError] = useState(false);
+
+  const hasImage = !!char.imageUrl && !imgError;
+
   return (
     <motion.button
-      initial={{ opacity: 0, y: 10 }}
+      initial={{ opacity: 0, y: 12 }}
       animate={{ opacity: 1, y: 0 }}
-      transition={{ delay: index * 0.05 }}
-      whileHover={{ y: -8, scale: 1.05 }}
-      whileTap={{ scale: 0.98 }}
+      transition={{ delay: index * 0.04, type: 'spring', damping: 20 }}
+      whileHover={{ y: -6, scale: 1.04 }}
+      whileTap={{ scale: 0.97 }}
       onClick={onClick}
       className={cn(
-        "glass-card p-0 text-left group transition-all flex flex-col items-center border-t-0 border-r-0 border-l-0 border-b-4 relative overflow-hidden",
+        'relative text-left group overflow-hidden rounded-2xl flex flex-col border',
+        'bg-[#0d0d10] transition-shadow duration-300',
         getRarityBorder(char.rarity),
-        isHighRarity && " shadow-[0_10px_30px_-10px_rgba(0,0,0,0.5)]"
+        isHighRarity && 'shadow-[0_8px_32px_-8px_rgba(0,0,0,0.6)]',
       )}
     >
-      <div className={cn("w-full h-1", getRarityBg(char.rarity))} />
+      {/* Top rarity stripe */}
+      <div className={cn('w-full h-[3px] flex-shrink-0', getRarityBg(char.rarity))} />
 
-      <div className="absolute top-3 left-3 z-20 px-2 py-0.5 rounded-full bg-black/80 border border-white/10 backdrop-blur-md">
-        <span className="text-[10px] font-mono font-black text-white">x{char.count || 1}</span>
+      {/* Count badge */}
+      <div className="absolute top-3 left-3 z-20 px-1.5 py-0.5 rounded-full bg-black/80 border border-white/10 backdrop-blur-sm">
+        <span className="text-[9px] font-mono font-black text-white">×{char.count || 1}</span>
       </div>
 
-      <div className="w-full aspect-square bg-gradient-to-b from-white/5 to-transparent flex items-center justify-center group-hover:bg-white/10 transition-colors relative overflow-hidden">
-        <div className={cn("absolute inset-0 opacity-20 blur-2xl rounded-full scale-50 group-hover:scale-100 transition-transform duration-700", getRarityBg(char.rarity))} />
-        
-        {char.imageUrl && !localImgError ? (
-          <img 
-            src={char.imageUrl} 
-            alt={char.name} 
-            className="w-full h-full object-cover relative z-10 transition-transform duration-500 group-hover:scale-110"
-            referrerPolicy="no-referrer"
-            onError={() => setLocalImgError(true)}
-          />
+      {/* Shiny badge */}
+      {char.isShiny && (
+        <div className="absolute top-3 right-3 z-20">
+          <Sparkles size={12} className="text-yellow-400 animate-pulse" />
+        </div>
+      )}
+
+      {/* Art area */}
+      <div className="relative w-full aspect-square overflow-hidden bg-black/30">
+        {/* Rarity glow */}
+        <div className={cn(
+          'absolute inset-0 opacity-0 group-hover:opacity-25 transition-opacity duration-500 blur-2xl',
+          getRarityBg(char.rarity),
+        )} />
+
+        {hasImage ? (
+          <>
+            {!imgLoaded && <CardShimmer />}
+            <motion.img
+              src={char.imageUrl!}
+              alt={char.name}
+              referrerPolicy="no-referrer"
+              onLoad={() => setImgLoaded(true)}
+              onError={() => setImgError(true)}
+              animate={{ opacity: imgLoaded ? 1 : 0, scale: imgLoaded ? 1 : 1.05 }}
+              transition={{ duration: 0.5 }}
+              className="w-full h-full object-cover transition-transform duration-500 group-hover:scale-110"
+            />
+          </>
         ) : (
-          <motion.div
-             animate={isHighRarity ? { 
-               rotate: [0, 5, -5, 0], 
-               scale: [1, 1.1, 1],
-             } : {}}
-             transition={{ duration: 4, repeat: Infinity, ease: "easeInOut" }}
-             className="relative z-10 filter drop-shadow-[0_0_15px_rgba(255,255,255,0.2)] text-5xl"
-          >
-            {char.visualEmoji || charToIcon(char.category)}
-          </motion.div>
+          <CardArtFallback char={char} />
         )}
-        
+
+        {/* Legendary spin effect */}
         {char.rarity === 'Legendary' && (
-          <div className="absolute inset-0 z-0">
-             <div className="absolute inset-x-0 top-0 h-full bg-[conic-gradient(from_0deg,transparent,rgba(250,204,21,0.1),transparent)] animate-[spin_4s_linear_infinite]" />
+          <div className="absolute inset-0 pointer-events-none z-0">
+            <div className="absolute inset-0 bg-[conic-gradient(from_0deg,transparent,rgba(250,204,21,0.06),transparent)] animate-[spin_6s_linear_infinite]" />
           </div>
         )}
 
-        <div className="absolute inset-0 pointer-events-none bg-gradient-to-tr from-white/0 via-white/5 to-white/0 translate-x-[-100%] group-hover:translate-x-[100%] transition-transform duration-1000" />
-        
-        {char.isShiny && <div className="absolute top-2 right-2 text-yellow-400 font-bold text-xs animate-bounce">✨</div>}
+        {/* Hover shine sweep */}
+        <div className="absolute inset-0 pointer-events-none bg-gradient-to-tr from-transparent via-white/6 to-transparent -translate-x-full group-hover:translate-x-full transition-transform duration-700" />
       </div>
 
-      <div className="w-full p-3 bg-black/40 backdrop-blur-sm mt-auto border-t border-white/5">
-        <h4 className={cn("font-black text-[11px] truncate mb-0.5 tracking-tight group-hover:text-white transition-colors uppercase", isHighRarity ? getRarityColor(char.rarity) : "text-gray-300")}>
+      {/* Info strip */}
+      <div className="w-full px-3 py-2.5 bg-black/50 backdrop-blur-sm border-t border-white/5 mt-auto">
+        <h4 className={cn(
+          'font-black text-[11px] truncate mb-0.5 tracking-tight',
+          isHighRarity ? getRarityColor(char.rarity) : 'text-gray-200',
+          'group-hover:text-white transition-colors',
+        )}>
           {char.name}
         </h4>
         <div className="flex justify-between items-center">
-          <p className={cn("text-[9px] font-mono font-bold tracking-[0.1em] uppercase opacity-60", getRarityColor(char.rarity))}>
+          <span className={cn('text-[8px] font-mono font-bold tracking-widest uppercase opacity-50', getRarityColor(char.rarity))}>
             {char.rarity}
-          </p>
-          <p className="text-[10px] font-mono text-gray-500 uppercase">LV.{char.level || 1}</p>
+          </span>
+          <span className="text-[9px] font-mono text-gray-600">LV.{char.level || 1}</span>
         </div>
       </div>
 
+      {/* High-rarity particle sparks */}
       {isHighRarity && (
-        <div className="absolute inset-0 pointer-events-none">
-          <div className="absolute top-2 right-4 w-1 h-1 bg-white rounded-full animate-ping opacity-20" />
-          <div className="absolute bottom-12 left-4 w-1 h-1 bg-white rounded-full animate-ping opacity-20 delay-700" />
+        <div className="absolute inset-0 pointer-events-none z-10">
+          <div className="absolute top-2 right-5 w-0.5 h-0.5 bg-white rounded-full animate-ping opacity-30" />
+          <div className="absolute bottom-10 left-3 w-0.5 h-0.5 bg-white rounded-full animate-ping opacity-20 [animation-delay:700ms]" />
         </div>
       )}
     </motion.button>
   );
-}
-
-function charToIcon(cat: string) {
-  switch (cat) {
-    case '생명체': return '👾';
-    case '유물': return '🔮';
-    case '현상': return '✨';
-    case '공간': return '🌌';
-    case '추상': return '🧿';
-    case '상황': return '💥';
-    case '관계': return '🔗';
-    default: return '❓';
-  }
 }
