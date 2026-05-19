@@ -96,7 +96,7 @@ ${basePrompt}
 • wordHint: 단어를 직접 언급하지 않고 맥락·유래·연상으로 추측 가능한 힌트 (1장)
 [SECTION 2] 넥서스 실체화 존재 프로필
 • characterName: 단어의 본질을 담은 존재의 고유한 이름 (한국어 또는 한자어 기반, 2~6자)
-• visualKeywords: 이 단어만의 고유한 시각적 정체성을 표현하는 영문 키워드 3개 (" / " 구분). 반드시 단어의 사전적 의미와 뉘앙스를 반영하며, 유사한 의미의 다른 단어와 겹치지 않는 독자적 키워드여야 한다. 소재보다 분위기·감정·추상 개념 중심으로 작성.
+• visualKeywords: 이 단어를 처음 본 사람도 즉시 알아볼 수 있는 구체적인 시각 요소 3가지 (" / " 구분). 반드시 단어의 사전적 의미에서 직접 연상되는 실물 오브젝트·복장·신체 특징·색상으로 작성. 추상·감정·분위기 키워드 금지. 예) HARVEST → golden wheat sheaf / iron sickle / sun-scorched harvest cloak
 • charDescription: 존재의 기원, 능력, 세계관 속 역할 (3~4문장, 문학적 표현 사용)
 • category: '생명체' | '유물' | '현상' | '공간' | '추상' | '상황' | '관계' 중 선택
 • rarity: Common | Uncommon | Rare | Unique | Epic | Legendary 중 선택
@@ -139,7 +139,7 @@ ${basePrompt}
       const rarityArt = (RARITY_ART_DIRECTION as any)[rarity] || RARITY_ART_DIRECTION.Common;
       const rarityLore = (RARITY_LORE as any)[rarity] || RARITY_LORE.Common;
 
-      const imagePrompt = `A character that visually embodies the concept of "${word}" (meaning: ${visualKeywords}). ${rarityArt} The character's entire appearance, color palette, costume motifs, and accessories must directly reflect the essence of "${word}" — not generic fantasy. Character name: ${name}. ${description} 2D anime illustration, cel shading, korean mobile RPG style, clean ink outlines, half-body portrait. Simple gradient background, strong rim lighting.`;
+      const imagePrompt = `2D anime illustration, cel shading, korean mobile RPG style, half-body portrait. Character concept: "${word}". Signature visual elements that MUST appear: ${visualKeywords}. These elements are the core identity — incorporate them directly into the costume, weapon, or body. ${rarityArt} Simple gradient background, strong rim lighting. Not generic fantasy warrior — every design detail must remind the viewer of "${word}".`;
 
       const negativePrompt = "text, watermark, signature, logo, letters, words, typography, glyphs, subtitles, UI, HUD, frames, borders, bad anatomy, deformed, ugly, blurry, low quality";
 
