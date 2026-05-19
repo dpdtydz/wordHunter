@@ -21,7 +21,7 @@ export default function HangmanGame({ mode, onExit }: HangmanGameProps) {
   const [mistakes, setMistakes] = useState(0);
   const [gameState, setGameState] = useState<'playing' | 'won' | 'lost'>('playing');
   const [showReward, setShowReward] = useState(false);
-  const [hintLevel, setHintLevel] = useState(1); 
+  const [hintLevel, setHintLevel] = useState(2);
   const [captureRate, setCaptureRate] = useState(100);
   const [directGuess, setDirectGuess] = useState("");
   const [lastWord, setLastWord] = useState<string>("");
@@ -37,7 +37,7 @@ export default function HangmanGame({ mode, onExit }: HangmanGameProps) {
     setMistakes(0);
     setGameState('playing');
     setShowReward(false);
-    setHintLevel(1);
+    setHintLevel(2);
     setCaptureRate(100);
     setDirectGuess("");
     setShowRetry(false);
@@ -255,7 +255,7 @@ export default function HangmanGame({ mode, onExit }: HangmanGameProps) {
                   </div>
                 )}
                 {hintLevel < 3 && (
-                  <button onClick={() => { setHintLevel(prev => prev + 1); setCaptureRate(prev => Math.max(10, prev - 15)); if (mode === 'Challenge') setMistakes(prev => prev + 1); }} className="text-[10px] text-brand-cyan/60 hover:text-brand-cyan mt-3 border-b border-brand-cyan/20 transition-colors py-0.5">공명 주파수 조정 (확률 -15%)</button>
+                  <button onClick={() => { setHintLevel(3); setCaptureRate(prev => Math.max(10, prev - 15)); if (mode === 'Challenge') setMistakes(prev => prev + 1); }} className="text-[10px] text-brand-cyan/60 hover:text-brand-cyan mt-3 border-b border-brand-cyan/20 transition-colors py-0.5">핵심 의미 공개 (확률 -15%)</button>
                 )}
               </motion.div>
             </AnimatePresence>

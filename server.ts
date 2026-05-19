@@ -139,7 +139,7 @@ ${basePrompt}
       const rarityArt = (RARITY_ART_DIRECTION as any)[rarity] || RARITY_ART_DIRECTION.Common;
       const rarityLore = (RARITY_LORE as any)[rarity] || RARITY_LORE.Common;
 
-      const imagePrompt = `masterpiece, best quality, ultra-detailed, 2D anime illustration, cel shading, korean mobile RPG art style similar to Epic Seven, clean sharp ink outlines, luminous skin, large expressive detailed eyes, highly ornate layered fantasy costume with glowing accents. Half-body portrait, three-quarter pose. The concept is "${word}" (${visualKeywords}) — color palette and costume must uniquely express this word. Character: ${name}. ${description}. Rarity: ${rarity} — ${rarityArt}. Simple gradient background, strong rim lighting, magical particle effects.`;
+      const imagePrompt = `A character that visually embodies the concept of "${word}" (meaning: ${visualKeywords}). ${rarityArt} The character's entire appearance, color palette, costume motifs, and accessories must directly reflect the essence of "${word}" — not generic fantasy. Character name: ${name}. ${description} 2D anime illustration, cel shading, korean mobile RPG style, clean ink outlines, half-body portrait. Simple gradient background, strong rim lighting.`;
 
       const negativePrompt = "text, watermark, signature, logo, letters, words, typography, glyphs, subtitles, UI, HUD, frames, borders, bad anatomy, deformed, ugly, blurry, low quality";
 
