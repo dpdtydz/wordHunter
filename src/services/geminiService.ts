@@ -1,5 +1,5 @@
 import { Rarity } from "../types";
-import { db, storage, handleFirestoreError, OperationType } from "../lib/firebase";
+import { db, storage } from "../lib/firebase";
 import { doc, getDoc, setDoc, serverTimestamp } from "firebase/firestore";
 import { ref, uploadString, getDownloadURL } from "firebase/storage";
 
@@ -89,12 +89,13 @@ export function generateAndStoreCharacterImage(
 
   const promise = (async (): Promise<string | null> => {
     const targetWord = word.toUpperCase();
-    
+
     if (!forceRefresh) {
       try {
         const docRef = doc(db, "global_vault", targetWord);
         const snapshot = await getDoc(docRef);
         if (snapshot.exists() && snapshot.data().imageUrl) {
+          console.log(`[Nexus Client] Image vault hit: ${targetWord}`);
           return snapshot.data().imageUrl;
         }
       } catch (e) {
@@ -115,12 +116,13 @@ export function generateAndStoreCharacterImage(
       }
 
       const { base64 } = await response.json();
-      
+
       const storageRef = ref(storage, `characters/${targetWord}.png`);
-      console.log(`[Nexus Client] Uploading generated image to Storage...`);
+      console.log(`[Nexus Client] Uploading to Storage...`);
       await uploadString(storageRef, base64, 'base64', { contentType: 'image/png' });
       const downloadUrl = await getDownloadURL(storageRef);
-      
+      console.log(`[Nexus Client] Storage upload complete for ${targetWord}`);
+
       try {
         const docRef = doc(db, "global_vault", targetWord);
         await setDoc(docRef, {
@@ -128,7 +130,7 @@ export function generateAndStoreCharacterImage(
           updatedAt: serverTimestamp()
         }, { merge: true });
       } catch (e) {
-        console.error(`[Nexus Client] Failed to update vault with imageUrl for ${targetWord}:`, e);
+        console.error(`[Nexus Client] Failed to update vault with imageUrl:`, e);
       }
 
       return downloadUrl;

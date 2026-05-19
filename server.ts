@@ -1,7 +1,7 @@
 import express from "express";
 import path from "path";
 import { createServer as createViteServer } from "vite";
-import { GoogleGenAI, Type, Modality } from "@google/genai";
+import { GoogleGenAI, Type } from "@google/genai";
 import { readFileSync, existsSync } from "fs";
 
 const PORT = 3000;
@@ -15,11 +15,6 @@ async function startServer() {
     httpOptions: { headers: { 'User-Agent': 'aistudio-build' } }
   });
   
-  const aiImage = new GoogleGenAI({
-    apiKey: process.env.GEMINI_API_KEY || "",
-    httpOptions: { apiVersion: "v1beta", headers: { 'User-Agent': 'aistudio-build' } }
-  });
-
   const SYSTEM_INSTRUCTION = `당신은 세계적인 수집형 판타지 RPG "워드 넥서스"의 수석 세계관 설계자입니다.
 단어 하나하나가 살아있는 존재로 실체화되는 이 세계에서, 당신은 각 단어의 본질을 가장 극적이고 매력적인 캐릭터로 빚어냅니다.
 이모지나 이모티콘은 절대 사용하지 마세요. 모든 텍스트는 순수한 한국어/영어 문자로만 작성하세요.`;
@@ -144,58 +139,22 @@ ${basePrompt}
       const rarityArt = (RARITY_ART_DIRECTION as any)[rarity] || RARITY_ART_DIRECTION.Common;
       const rarityLore = (RARITY_LORE as any)[rarity] || RARITY_LORE.Common;
 
-      const imagePrompt = `
-High-end mobile collector RPG character card art. Portrait format.
-Character: ${name} (${word})
-Description: ${description}
-Visual Essence: ${visualKeywords}
-Rarity: ${rarity} - ${rarityLore}
-Art Direction: ${rarityArt}
-Detailed anime fantasy style, cinematic lighting, 4k resolution. No text, no frames, no watermarks.
-      `.trim();
+      const imagePrompt = `High-end mobile collector RPG character card art. Portrait format. Character: ${name} (${word}). Description: ${description}. Visual Essence: ${visualKeywords}. Rarity: ${rarity} - ${rarityLore}. Art Direction: ${rarityArt}. Detailed anime fantasy style, cinematic lighting, 4k resolution. No text, no frames, no watermarks.`;
 
-      const IMAGE_MODELS = [
-        "gemini-2.5-flash-image",
-        "gemini-3.1-flash-image-preview",
-      ];
+      const encodedPrompt = encodeURIComponent(imagePrompt);
+      const pollinationsUrl = `https://image.pollinations.ai/prompt/${encodedPrompt}?width=512&height=768&nologo=true&model=flux`;
 
-      let base64Data: string | null = null;
-      let lastErr: any;
+      console.log(`[Nexus Server] Requesting image from Pollinations for ${word}`);
+      const imgResponse = await fetch(pollinationsUrl);
 
-      for (const modelName of IMAGE_MODELS) {
-        try {
-          console.log(`[Nexus Server] Trying image gen with ${modelName}`);
-          const response = await aiImage.models.generateContent({
-            model: modelName,
-            contents: imagePrompt,
-            config: {
-              responseModalities: [Modality.IMAGE]
-            }
-          });
-
-          const parts = response.candidates?.[0]?.content?.parts;
-          if (parts) {
-            for (const part of parts) {
-              if (part.inlineData?.data) {
-                base64Data = part.inlineData.data;
-                break;
-              }
-            }
-          }
-          if (base64Data) break;
-        } catch (err: any) {
-          lastErr = err;
-          console.warn(`[Nexus Server] ${modelName} failed: ${err.message}`);
-          continue;
-        }
+      if (!imgResponse.ok) {
+        throw new Error(`Pollinations returned ${imgResponse.status}`);
       }
 
-      if (!base64Data) {
-        throw lastErr || new Error("Image generation failed");
-      }
+      const arrayBuffer = await imgResponse.arrayBuffer();
+      const base64Data = Buffer.from(arrayBuffer).toString("base64");
 
       console.log(`[Nexus Server] Sending base64 image back for ${word}`);
-
       res.json({ base64: base64Data });
     } catch (error: any) {
       console.error("[Nexus Server] Image gen failed:", error);
