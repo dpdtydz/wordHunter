@@ -138,7 +138,7 @@ ${basePrompt}
 
   expressApp.post("/api/generate-image", async (req, res) => {
     try {
-      const { word, name, description, rarity, visualKeywords, gender, weapon } = req.body;
+      const { word, name, description, rarity, visualKeywords, gender, weapon, wordKorean } = req.body;
 
       const rarityArt = (RARITY_ART_DIRECTION as any)[rarity] || RARITY_ART_DIRECTION.Common;
 
