@@ -29,12 +29,12 @@ async function startServer() {
   };
 
   const RARITY_ART_DIRECTION = {
-    Common: "Clean, grounded illustration with a warm natural color palette. Approachable and relatable character design. Soft ambient lighting.",
-    Uncommon: "Polished character design with vibrant accent colors. Dynamic confident pose. Subtle magical shimmer around the silhouette.",
-    Rare: "Premium illustration with intricate costume details. Dramatic cinematic side-lighting. Elegant particle or elemental effects tied to the word's theme.",
-    Unique: "Striking iconic design with a distinctive color signature no other card shares. Powerful stance. Complex patterns or motifs etched into armor/clothing that reference the word's meaning.",
-    Epic: "High-drama composition. Intense magical storm or world-scale elemental effects. The character radiates overwhelming presence; background reality warps slightly around them.",
-    Legendary: "Transcendent masterpiece. Cosmic or divine scale. Reality fractures behind the character. Every pixel must feel inevitable and awe-inspiring. This is the pinnacle visual expression of the concept.",
+    Common:    "Clean 2D illustration, warm soft lighting, simple elegant outfit with minimal accessories. Friendly approachable expression. Pastel-tinted background.",
+    Uncommon:  "Polished 2D art, vibrant color accents, dynamic pose with flowing cape or hair. Subtle magical glow outlining the silhouette. Mid-tier fantasy costume detail.",
+    Rare:      "Premium Epic Seven-style illustration. Intricate ornate armor or robe with glowing rune engravings. Dramatic rim lighting, elemental particle effects swirling around the character. Intense focused gaze.",
+    Unique:    "Iconic design with a bold exclusive color signature. Highly detailed costume layering with glowing motifs referencing the word's meaning. Powerful commanding stance, complex magical aura.",
+    Epic:      "Epic Seven 5-star quality. Full cinematic composition. Massive elemental storm or world-fracturing magical effect as background. Character radiates blinding aura. Godlike presence, elaborate crown or wings, reality bending around them.",
+    Legendary: "Transcendent Epic Seven Moonlight-tier masterpiece. Cosmic divine scale. Deep space or shattered dimensional rift behind the character. Every detail — from the eyes to the fingertips — exudes absolute authority and inevitability. The most breathtaking image possible.",
   };
 
   const TEXT_MODELS = [
@@ -139,7 +139,7 @@ ${basePrompt}
       const rarityArt = (RARITY_ART_DIRECTION as any)[rarity] || RARITY_ART_DIRECTION.Common;
       const rarityLore = (RARITY_LORE as any)[rarity] || RARITY_LORE.Common;
 
-      const imagePrompt = `High-end mobile collector RPG character card art. Portrait format. The English word "${word}" is the sole creative anchor — the entire image must visually embody its specific meaning and emotional nuance. Character: ${name}. Unique visual identity: ${visualKeywords}. Narrative: ${description}. RARITY LEVEL: ${rarity} — this rarity must be immediately visible in the art style: ${rarityArt}. Lore status: ${rarityLore}. The character design, pose, color palette, and environment must be unmistakably tied to "${word}" and look completely different from any other word's card. Detailed anime fantasy style, cinematic lighting, 4k resolution. STRICT: absolutely no text, no letters, no glyphs, no watermarks, no signatures, no UI elements anywhere in the image.`;
+      const imagePrompt = `Epic Seven mobile RPG art style. High-quality 2D Korean fantasy illustration. Full portrait, character centered, dramatic three-quarter pose. The concept "${word}" (${visualKeywords}) defines every visual choice. Character name: ${name}. Lore: ${description}. Rarity: ${rarity} — ${rarityArt} — ${rarityLore}. Art must evoke Epic Seven's signature style: luminous skin shading, highly detailed ornate costume with flowing fabric and glowing accents, expressive face with large detailed eyes, rich saturated color palette unique to "${word}", dynamic hair movement, cinematic depth-of-field background with atmospheric particle effects. STRICT: no text, no letters, no glyphs, no watermarks, no symbols, no signatures anywhere in the image.`;
 
       const negativePrompt = encodeURIComponent("text, watermark, signature, logo, letters, words, typography, characters, glyphs, subtitles, captions, UI, HUD, frames, borders");
       const encodedPrompt = encodeURIComponent(imagePrompt);
