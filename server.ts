@@ -96,7 +96,7 @@ ${basePrompt}
 • wordHint: 단어를 직접 언급하지 않고 맥락·유래·연상으로 추측 가능한 힌트 (1장)
 [SECTION 2] 넥서스 실체화 존재 프로필
 • characterName: 단어의 본질을 담은 존재의 고유한 이름 (한국어 또는 한자어 기반, 2~6자)
-• visualKeywords: AI 이미지 생성에 최적화된 영문 시각 키워드 3개를 " / " 로 구분
+• visualKeywords: 이 단어만의 고유한 시각적 정체성을 표현하는 영문 키워드 3개 (" / " 구분). 반드시 단어의 사전적 의미와 뉘앙스를 반영하며, 유사한 의미의 다른 단어와 겹치지 않는 독자적 키워드여야 한다. 소재보다 분위기·감정·추상 개념 중심으로 작성.
 • charDescription: 존재의 기원, 능력, 세계관 속 역할 (3~4문장, 문학적 표현 사용)
 • category: '생명체' | '유물' | '현상' | '공간' | '추상' | '상황' | '관계' 중 선택
 • rarity: Common | Uncommon | Rare | Unique | Epic | Legendary 중 선택
@@ -139,7 +139,7 @@ ${basePrompt}
       const rarityArt = (RARITY_ART_DIRECTION as any)[rarity] || RARITY_ART_DIRECTION.Common;
       const rarityLore = (RARITY_LORE as any)[rarity] || RARITY_LORE.Common;
 
-      const imagePrompt = `High-end mobile collector RPG character card art. Portrait format. Character: ${name} (${word}). Description: ${description}. Visual Essence: ${visualKeywords}. Rarity: ${rarity} - ${rarityLore}. Art Direction: ${rarityArt}. Detailed anime fantasy style, cinematic lighting, 4k resolution. No text, no frames, no watermarks.`;
+      const imagePrompt = `High-end mobile collector RPG character card art. Portrait format. The English word "${word}" is the sole creative anchor — the entire image must visually embody its specific meaning and emotional nuance. Character: ${name}. Unique visual identity: ${visualKeywords}. Narrative: ${description}. Rarity: ${rarity} — ${rarityArt}. The character design, pose, color palette, and environment must be unmistakably tied to "${word}" and look completely different from any other word's card. Detailed anime fantasy style, cinematic lighting, 4k resolution. No text, no UI frames, no watermarks.`;
 
       const encodedPrompt = encodeURIComponent(imagePrompt);
       const pollinationsUrl = `https://image.pollinations.ai/prompt/${encodedPrompt}?width=512&height=768&nologo=true&model=flux`;
