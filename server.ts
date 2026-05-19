@@ -98,8 +98,8 @@ ${basePrompt}
 • characterName: 단어의 본질을 담은 존재의 고유한 이름 (한국어 또는 한자어 기반, 2~6자)
 • visualKeywords: 이 단어를 처음 본 사람도 즉시 알아볼 수 있는 구체적인 시각 요소 3가지 (" / " 구분). 반드시 단어의 사전적 의미에서 직접 연상되는 실물 오브젝트·복장·신체 특징·색상으로 작성. 추상·감정·분위기 키워드 금지. 예) HARVEST → golden wheat sheaf / sun-scorched harvest cloak / amber grain field
 • weapon: 이 존재가 들고 있는 고유한 무기 또는 도구. 반드시 단어의 의미와 직접 연관된 구체적 실물로 작성 (영문). 예) HARVEST → war scythe wrapped in wheat stalks / POISON → venom-dripping fang dagger / THUNDER → split-ended lightning lance. 무기가 없는 개념(공간·추상)이면 대신 핵심 아이템·액세서리로 대체.
-• gender: 이 존재의 성별 — 'male' | 'female' | 'androgynous' 중 단어의 뉘앙스에 맞게 선택
-• charDescription: 존재의 기원, 능력, 세계관 속 역할 (3~4문장, 문학적 표현 사용). gender와 weapon 필드와 일관되게 — 선택한 성별 대명사 사용, 무기/아이템을 서사에 자연스럽게 포함.
+• gender: 이 존재의 성별 — 'male'을 기본으로 하되, 단어가 명백히 여성적 뉘앙스(모성·우아함·치유·꽃·미 등)일 때만 예외적으로 'female' 선택. 비율 기준: male 90%, female 10%. 'androgynous'는 사용하지 않음.
+• charDescription: 존재의 기원, 능력, 세계관 속 역할 (3~4문장, 문학적 표현 사용). gender와 weapon 필드와 일관되게 — 선택한 성별 대명사 사용, 무기/아이템을 서사에 자연스럽게 포함. 무기 이름은 반드시 한국어로 번역하여 사용 (영문 그대로 쓰지 말 것). 예) "Crystal-encrusted hoe of eternal growth" → "영원한 성장의 수정 괭이"
 • category: '생명체' | '유물' | '현상' | '공간' | '추상' | '상황' | '관계' 중 선택
 • rarity: Common | Uncommon | Rare | Unique | Epic | Legendary 중 선택
 모든 필드는 한국어로 작성 (visualKeywords, gender는 영문). JSON 형식으로 반환.
@@ -142,10 +142,12 @@ ${basePrompt}
 
       const rarityArt = (RARITY_ART_DIRECTION as any)[rarity] || RARITY_ART_DIRECTION.Common;
 
-      const genderTag = gender === 'female' ? '1girl, female character,' : gender === 'male' ? '1boy, male character,' : 'androgynous character,';
-      const weaponTag = weapon ? `Character is holding or wielding: ${weapon}. This weapon MUST be clearly visible and prominent in the image.` : '';
+      const genderTag = gender === 'female' ? '1girl, female character,' : '1boy, male character,';
+      const weaponTag = weapon ? `Weapon clearly visible in hand: ${weapon}.` : '';
+      const conceptLine = `This character IS the living embodiment of "${word}" (${wordKorean}). A viewer must instantly think of "${word}" just by looking at this character.`;
+      const visualLine = `Required visual elements on costume, body, and background: ${visualKeywords}. These are NON-NEGOTIABLE — every element must be present.`;
 
-      const imagePrompt = `2D anime illustration, cel shading, korean mobile RPG style, half-body portrait. ${genderTag} Character concept: "${word}". Signature visual elements that MUST appear on costume and body: ${visualKeywords}. ${weaponTag} ${rarityArt} Simple gradient background, strong rim lighting. Every design detail must remind the viewer of "${word}" — not a generic fantasy warrior.`;
+      const imagePrompt = `2D anime illustration, cel shading, korean mobile RPG style, half-body portrait. ${genderTag} ${conceptLine} ${visualLine} ${weaponTag} ${rarityArt} Simple gradient background, strong rim lighting.`;
 
       const negativePrompt = "text, watermark, signature, logo, letters, words, typography, glyphs, subtitles, UI, HUD, frames, borders, bad anatomy, deformed, ugly, blurry, low quality";
 
@@ -153,7 +155,7 @@ ${basePrompt}
         {
           // FLUX.1-schnell — hf-inference provider 공식 지원 유일 모델 (2025-05 기준)
           url: "https://router.huggingface.co/hf-inference/models/black-forest-labs/FLUX.1-schnell",
-          body: () => JSON.stringify({ inputs: imagePrompt, parameters: { negative_prompt: negativePrompt, width: 512, height: 768, num_inference_steps: 4, guidance_scale: 0 } }),
+          body: () => JSON.stringify({ inputs: imagePrompt, parameters: { negative_prompt: negativePrompt, width: 512, height: 768, num_inference_steps: 8, guidance_scale: 3.5 } }),
           parseB64: async (r: Response) => { const buf = await r.arrayBuffer(); return Buffer.from(buf).toString("base64"); },
         },
         {
