@@ -109,6 +109,8 @@ export default function Collection({ onBack }: CollectionProps) {
         (data as any).visualKeywords || data.visualEmoji,
         data.wordKorean,
         true,
+        (data as any).gender ?? 'androgynous',
+        (data as any).weapon ?? '',
       );
       if (newImageUrl) {
         const final = { ...textOnlyChar, imageUrl: newImageUrl };

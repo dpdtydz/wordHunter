@@ -11,6 +11,8 @@ export interface GeneratedWord {
   visualKeywords: string;  // 3 art-direction keywords separated by " / "
   /** @deprecated kept for Firestore backwards-compat, same value as visualKeywords */
   visualEmoji: string;
+  weapon: string;
+  gender: 'male' | 'female' | 'androgynous';
   category: '생명체' | '유물' | '현상' | '공간' | '추상' | '상황' | '관계';
   characterName: string;
   charDescription: string;
@@ -79,7 +81,9 @@ export function generateAndStoreCharacterImage(
   rarity: Rarity,
   visualKeywords: string = "",
   wordKorean: string = "",
-  forceRefresh: boolean = false
+  forceRefresh: boolean = false,
+  gender: string = "androgynous",
+  weapon: string = ""
 ): Promise<string | null> {
   const key = `${word.toUpperCase()}${forceRefresh ? "_refresh" : ""}`;
 
@@ -107,7 +111,7 @@ export function generateAndStoreCharacterImage(
       const response = await fetch("/api/generate-image", {
         method: "POST",
         headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ word, name, description, rarity, visualKeywords, wordKorean }),
+        body: JSON.stringify({ word, name, description, rarity, visualKeywords, wordKorean, gender, weapon }),
       });
 
       if (!response.ok) {
