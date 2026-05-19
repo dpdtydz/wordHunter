@@ -139,10 +139,11 @@ ${basePrompt}
       const rarityArt = (RARITY_ART_DIRECTION as any)[rarity] || RARITY_ART_DIRECTION.Common;
       const rarityLore = (RARITY_LORE as any)[rarity] || RARITY_LORE.Common;
 
-      const imagePrompt = `High-end mobile collector RPG character card art. Portrait format. The English word "${word}" is the sole creative anchor — the entire image must visually embody its specific meaning and emotional nuance. Character: ${name}. Unique visual identity: ${visualKeywords}. Narrative: ${description}. Rarity: ${rarity} — ${rarityArt}. The character design, pose, color palette, and environment must be unmistakably tied to "${word}" and look completely different from any other word's card. Detailed anime fantasy style, cinematic lighting, 4k resolution. No text, no UI frames, no watermarks.`;
+      const imagePrompt = `High-end mobile collector RPG character card art. Portrait format. The English word "${word}" is the sole creative anchor — the entire image must visually embody its specific meaning and emotional nuance. Character: ${name}. Unique visual identity: ${visualKeywords}. Narrative: ${description}. RARITY LEVEL: ${rarity} — this rarity must be immediately visible in the art style: ${rarityArt}. Lore status: ${rarityLore}. The character design, pose, color palette, and environment must be unmistakably tied to "${word}" and look completely different from any other word's card. Detailed anime fantasy style, cinematic lighting, 4k resolution. STRICT: absolutely no text, no letters, no glyphs, no watermarks, no signatures, no UI elements anywhere in the image.`;
 
+      const negativePrompt = encodeURIComponent("text, watermark, signature, logo, letters, words, typography, characters, glyphs, subtitles, captions, UI, HUD, frames, borders");
       const encodedPrompt = encodeURIComponent(imagePrompt);
-      const pollinationsUrl = `https://image.pollinations.ai/prompt/${encodedPrompt}?width=512&height=768&nologo=true&model=flux`;
+      const pollinationsUrl = `https://image.pollinations.ai/prompt/${encodedPrompt}?width=512&height=768&nologo=true&model=flux&negative_prompt=${negativePrompt}&seed=${Math.floor(Math.random() * 999999)}`;
 
       console.log(`[Nexus Server] Requesting image from Pollinations for ${word}`);
       const imgResponse = await fetch(pollinationsUrl);
