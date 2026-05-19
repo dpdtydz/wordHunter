@@ -29,12 +29,12 @@ async function startServer() {
   };
 
   const RARITY_ART_DIRECTION = {
-    Common:    "Clean 2D illustration, warm soft lighting, simple elegant outfit with minimal accessories. Friendly approachable expression. Pastel-tinted background.",
-    Uncommon:  "Polished 2D art, vibrant color accents, dynamic pose with flowing cape or hair. Subtle magical glow outlining the silhouette. Mid-tier fantasy costume detail.",
-    Rare:      "Premium Epic Seven-style illustration. Intricate ornate armor or robe with glowing rune engravings. Dramatic rim lighting, elemental particle effects swirling around the character. Intense focused gaze.",
-    Unique:    "Iconic design with a bold exclusive color signature. Highly detailed costume layering with glowing motifs referencing the word's meaning. Powerful commanding stance, complex magical aura.",
-    Epic:      "Epic Seven 5-star quality. Full cinematic composition. Massive elemental storm or world-fracturing magical effect as background. Character radiates blinding aura. Godlike presence, elaborate crown or wings, reality bending around them.",
-    Legendary: "Transcendent Epic Seven Moonlight-tier masterpiece. Cosmic divine scale. Deep space or shattered dimensional rift behind the character. Every detail — from the eyes to the fingertips — exudes absolute authority and inevitability. The most breathtaking image possible.",
+    Common:    "Simple gradient background. Clean cel-shaded 2D anime character, soft rim lighting, modest fantasy outfit. Warm color palette. Half-body portrait.",
+    Uncommon:  "Dark gradient background with subtle glow. Cel-shaded 2D art, vibrant color accents, flowing cape or hair movement. Glowing eyes, dynamic confident pose. Half-body portrait.",
+    Rare:      "Deep atmospheric background (single dominant color gradient). Highly detailed cel-shaded fantasy outfit with layered armor and glowing rune accents. Strong rim lighting, magical particle orbs floating around the character. Sharp intense gaze. Half-body portrait.",
+    Unique:    "Dark dramatic background with signature color aura radiating behind character. Intricate layered fantasy costume, ornate crown or weapon. Glowing eyes and glowing weapon or artifact. Complex magical circle or energy wings. Half-body portrait.",
+    Epic:      "Dramatic dark background, massive radiant aura explosion behind the character. Cel-shaded 2D art at peak quality. Elaborate ornate armor with golden or silver engravings, large glowing wings or energy mantle. Overwhelming godlike presence, blinding light emission from body. Half-body portrait.",
+    Legendary: "Pure white or cosmic void background. Transcendent cel-shaded 2D masterpiece. Character in pure white or black ethereal attire, silver hair flowing, crystalline or divine accessories. Intense glowing eyes piercing the viewer. Calm yet absolute divine aura — no explosions, only pure overwhelming elegance and power. Half-body portrait.",
   };
 
   const TEXT_MODELS = [
@@ -139,21 +139,50 @@ ${basePrompt}
       const rarityArt = (RARITY_ART_DIRECTION as any)[rarity] || RARITY_ART_DIRECTION.Common;
       const rarityLore = (RARITY_LORE as any)[rarity] || RARITY_LORE.Common;
 
-      const imagePrompt = `Epic Seven mobile RPG art style. High-quality 2D Korean fantasy illustration. Full portrait, character centered, dramatic three-quarter pose. The concept "${word}" (${visualKeywords}) defines every visual choice. Character name: ${name}. Lore: ${description}. Rarity: ${rarity} — ${rarityArt} — ${rarityLore}. Art must evoke Epic Seven's signature style: luminous skin shading, highly detailed ornate costume with flowing fabric and glowing accents, expressive face with large detailed eyes, rich saturated color palette unique to "${word}", dynamic hair movement, cinematic depth-of-field background with atmospheric particle effects. STRICT: no text, no letters, no glyphs, no watermarks, no symbols, no signatures anywhere in the image.`;
+      const imagePrompt = `masterpiece, best quality, ultra-detailed, 2D anime illustration, cel shading, korean mobile RPG art style similar to Epic Seven, clean sharp ink outlines, luminous skin, large expressive detailed eyes, highly ornate layered fantasy costume with glowing accents. Half-body portrait, three-quarter pose. The concept is "${word}" (${visualKeywords}) — color palette and costume must uniquely express this word. Character: ${name}. ${description}. Rarity: ${rarity} — ${rarityArt}. Simple gradient background, strong rim lighting, magical particle effects.`;
 
-      const negativePrompt = encodeURIComponent("text, watermark, signature, logo, letters, words, typography, characters, glyphs, subtitles, captions, UI, HUD, frames, borders");
-      const encodedPrompt = encodeURIComponent(imagePrompt);
-      const pollinationsUrl = `https://image.pollinations.ai/prompt/${encodedPrompt}?width=512&height=768&nologo=true&model=flux&negative_prompt=${negativePrompt}&seed=${Math.floor(Math.random() * 999999)}`;
+      const negativePrompt = "text, watermark, signature, logo, letters, words, typography, glyphs, subtitles, UI, HUD, frames, borders, bad anatomy, deformed, ugly, blurry, low quality";
 
-      console.log(`[Nexus Server] Requesting image from Pollinations for ${word}`);
-      const imgResponse = await fetch(pollinationsUrl);
+      const HF_PROVIDERS = [
+        {
+          // FLUX.1-schnell — hf-inference provider 공식 지원 유일 모델 (2025-05 기준)
+          url: "https://router.huggingface.co/hf-inference/models/black-forest-labs/FLUX.1-schnell",
+          body: () => JSON.stringify({ inputs: imagePrompt, parameters: { negative_prompt: negativePrompt, width: 512, height: 768, num_inference_steps: 4, guidance_scale: 0 } }),
+          parseB64: async (r: Response) => { const buf = await r.arrayBuffer(); return Buffer.from(buf).toString("base64"); },
+        },
+        {
+          // SD3 Medium — hf-inference 두 번째 공식 지원 모델
+          url: "https://router.huggingface.co/hf-inference/models/stabilityai/stable-diffusion-3-medium-diffusers",
+          body: () => JSON.stringify({ inputs: imagePrompt, parameters: { negative_prompt: negativePrompt, width: 512, height: 768, num_inference_steps: 30, guidance_scale: 7.5 } }),
+          parseB64: async (r: Response) => { const buf = await r.arrayBuffer(); return Buffer.from(buf).toString("base64"); },
+        },
+      ];
 
-      if (!imgResponse.ok) {
-        throw new Error(`Pollinations returned ${imgResponse.status}`);
+      let b64: string | null = null;
+      let lastErr = "";
+      for (const provider of HF_PROVIDERS) {
+        console.log(`[Nexus Server] Requesting image from ${provider.url}`);
+        const hfResponse = await fetch(provider.url, {
+          method: "POST",
+          headers: {
+            "Authorization": `Bearer ${process.env.HF_API_KEY}`,
+            "Content-Type": "application/json",
+          },
+          body: provider.body(),
+        });
+
+        if (!hfResponse.ok) {
+          lastErr = `${hfResponse.status}: ${await hfResponse.text()}`;
+          console.warn(`[Nexus Server] Provider failed: ${lastErr}`);
+          continue;
+        }
+
+        b64 = await provider.parseB64(hfResponse);
+        if (b64) break;
       }
 
-      const arrayBuffer = await imgResponse.arrayBuffer();
-      const inputBuffer = Buffer.from(arrayBuffer);
+      if (!b64) throw new Error(`All HuggingFace providers failed. Last error: ${lastErr}`);
+      const inputBuffer = Buffer.from(b64, "base64");
 
       // 하단 8% 크롭으로 워터마크 제거
       const meta = await sharp(inputBuffer).metadata();
