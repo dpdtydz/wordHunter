@@ -142,12 +142,17 @@ export default function HangmanGame({ mode, onExit }: HangmanGameProps) {
     const expBonus = Math.floor(rarities[char.rarity] * (captureRate / 100));
     const coinBonus = char.rarity === 'Common' ? 5 : 20;
 
+    const existingImageUrl = char.imageUrl || wordData.imageUrl || "";
+
     await updateProgress(expBonus, coinBonus);
     await addCharacterToCollection(char);
     setShowReward(true);
+    if (existingImageUrl) {
+      setWordData((prev: GeneratedWord | null) => prev ? { ...prev, imageUrl: existingImageUrl } : null);
+    }
 
-    // Generate image after capture (always — all rarities get art)
-    if (!char.imageUrl) {
+    // vault에 imageUrl 없을 때만 새로 생성
+    if (!existingImageUrl) {
       const { generateAndStoreCharacterImage } = await import('../services/geminiService');
       generateAndStoreCharacterImage(
         wordData.word,
@@ -156,6 +161,9 @@ export default function HangmanGame({ mode, onExit }: HangmanGameProps) {
         wordData.rarity,
         (wordData as any).visualKeywords || wordData.visualEmoji,
         wordData.wordKorean,
+        false,
+        wordData.gender ?? 'androgynous',
+        wordData.weapon ?? '',
       ).then(url => {
         if (url) {
           setWordData((prev: GeneratedWord | null) => prev ? { ...prev, imageUrl: url } : null);

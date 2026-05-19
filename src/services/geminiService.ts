@@ -23,10 +23,16 @@ export interface GeneratedWord {
 
 const imageInFlight = new Map<string, Promise<string | null>>();
 
+export interface CollectionStats {
+  rarityCounts: Record<string, number>;  // 전체 보유 수량 합계 (등급별)
+  recentRarities: string[];              // 최근 10판 결과 (최신순)
+}
+
 export async function generateWordData(
   difficulty: string,
   specificWord?: string,
-  forceRefresh: boolean = false
+  forceRefresh: boolean = false,
+  collectionStats?: CollectionStats
 ): Promise<GeneratedWord> {
   const targetWord = specificWord?.toUpperCase().replace(/[^A-Z]/g, "");
   
@@ -47,7 +53,7 @@ export async function generateWordData(
   const response = await fetch("/api/generate-word", {
     method: "POST",
     headers: { "Content-Type": "application/json" },
-    body: JSON.stringify({ difficulty, specificWord }),
+    body: JSON.stringify({ difficulty, specificWord, collectionStats }),
   });
 
   if (!response.ok) {
@@ -60,15 +66,19 @@ export async function generateWordData(
 
   try {
     const docRef = doc(db, "global_vault", docId);
+    // 기존 imageUrl이 있으면 덮어쓰지 않고 result에 복원
+    const existing = await getDoc(docRef);
+    const existingImageUrl = existing.exists() ? existing.data().imageUrl : null;
+    if (existingImageUrl) result.imageUrl = existingImageUrl;
+
     await setDoc(docRef, {
       ...result,
       id: docId,
       updatedAt: serverTimestamp()
     }, { merge: true });
-    console.log(`[Nexus Client] Persisted ${docId} to Vault`);
+    console.log(`[Nexus Client] Persisted ${docId} to Vault${existingImageUrl ? ' (imageUrl reused)' : ''}`);
   } catch (e: any) {
     console.error(`[Nexus Client] Failed to persist ${docId}:`, e);
-    // Don't throw, we still have the valid data
   }
 
   return result;

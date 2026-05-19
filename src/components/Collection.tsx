@@ -69,11 +69,29 @@ export default function Collection({ onBack }: CollectionProps) {
   const [reManifesting, setReManifesting] = useState(false);
   const [modalImgLoaded, setModalImgLoaded] = useState(false);
   const [modalImgError, setModalImgError] = useState(false);
+  const [showPwModal, setShowPwModal] = useState(false);
+  const [pwInput, setPwInput] = useState('');
+  const [pwError, setPwError] = useState(false);
 
   React.useEffect(() => {
     setModalImgLoaded(false);
     setModalImgError(false);
   }, [selectedChar?.id]);
+
+  const handleReManifestClick = () => {
+    setPwInput('');
+    setPwError(false);
+    setShowPwModal(true);
+  };
+
+  const handlePwConfirm = () => {
+    if (pwInput === '20260519') {
+      setShowPwModal(false);
+      if (selectedChar) handleReManifest(selectedChar);
+    } else {
+      setPwError(true);
+    }
+  };
 
   const handleReManifest = async (char: CapturedCharacter) => {
     setReManifesting(true);
@@ -311,7 +329,7 @@ export default function Collection({ onBack }: CollectionProps) {
                       )}
                     </p>
                     <button
-                      onClick={() => handleReManifest(selectedChar)}
+                      onClick={handleReManifestClick}
                       disabled={reManifesting}
                       className="flex items-center gap-2 bg-brand-purple/15 hover:bg-brand-purple/35 border border-brand-purple/40 px-4 py-2 rounded-xl text-brand-purple text-xs font-black transition-all group/btn disabled:opacity-40 whitespace-nowrap"
                     >
@@ -322,6 +340,59 @@ export default function Collection({ onBack }: CollectionProps) {
                     </button>
                   </div>
                 </div>
+              </div>
+            </motion.div>
+          </motion.div>
+        )}
+      </AnimatePresence>
+
+      {/* 재실체화 비밀번호 모달 */}
+      <AnimatePresence>
+        {showPwModal && (
+          <motion.div
+            initial={{ opacity: 0 }}
+            animate={{ opacity: 1 }}
+            exit={{ opacity: 0 }}
+            className="fixed inset-0 z-[60] flex items-center justify-center p-4 bg-brand-dark/95 backdrop-blur-xl"
+            onClick={() => setShowPwModal(false)}
+          >
+            <motion.div
+              initial={{ scale: 0.9, y: 16 }}
+              animate={{ scale: 1, y: 0 }}
+              exit={{ scale: 0.9, y: 16 }}
+              onClick={e => e.stopPropagation()}
+              className="w-full max-w-sm glass-card border border-brand-purple/40 rounded-2xl p-6 flex flex-col gap-4"
+            >
+              <div className="flex items-center gap-2">
+                <Wand2 size={18} className="text-brand-purple" />
+                <h3 className="font-black text-white tracking-widest text-sm uppercase">넥서스 재실체화 인증</h3>
+              </div>
+              <p className="text-xs text-gray-400 font-mono">관리자 암호를 입력하세요.</p>
+              <input
+                type="password"
+                value={pwInput}
+                onChange={e => { setPwInput(e.target.value); setPwError(false); }}
+                onKeyDown={e => e.key === 'Enter' && handlePwConfirm()}
+                placeholder="암호 입력..."
+                autoFocus
+                className="bg-brand-gray border border-white/10 focus:border-brand-purple rounded-lg px-4 py-2 text-sm outline-none transition-all"
+              />
+              {pwError && (
+                <p className="text-xs text-red-400 font-mono">잘못된 암호입니다.</p>
+              )}
+              <div className="flex gap-3">
+                <button
+                  onClick={() => setShowPwModal(false)}
+                  className="flex-1 py-2 rounded-xl bg-brand-gray text-gray-400 text-xs font-bold hover:bg-gray-700 transition-all"
+                >
+                  취소
+                </button>
+                <button
+                  onClick={handlePwConfirm}
+                  className="flex-1 py-2 rounded-xl bg-brand-purple text-white text-xs font-bold hover:brightness-110 transition-all"
+                >
+                  확인
+                </button>
               </div>
             </motion.div>
           </motion.div>

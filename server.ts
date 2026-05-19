@@ -77,14 +77,47 @@ async function startServer() {
     }
   });
 
+  const RARITY_ORDER = ['Common', 'Uncommon', 'Rare', 'Unique', 'Epic', 'Legendary'];
+  const CEILING = 4; // 같은 등급 N개 누적 시 한 단계 아래 확정
+
+  function calcForcedRarity(
+    collectionStats: { rarityCounts: Record<string, number>; recentRarities: string[] } | undefined
+  ): string | null {
+    if (!collectionStats) return null;
+    const { recentRarities } = collectionStats;
+    if (!recentRarities || recentRarities.length === 0) return null;
+
+    // 천장: 최근 결과에서 같은 등급이 연속 CEILING개 이상이면 한 단계 아래 확정
+    const streak = recentRarities[0];
+    const streakCount = recentRarities.filter(r => r === streak).length;
+    if (streakCount >= CEILING) {
+      const idx = RARITY_ORDER.indexOf(streak);
+      if (idx > 0) {
+        console.log(`[Nexus Server] Ceiling hit: ${streakCount}x ${streak} → forcing ${RARITY_ORDER[idx - 1]}`);
+        return RARITY_ORDER[idx - 1];
+      }
+    }
+    return null;
+  }
+
   expressApp.post("/api/generate-word", async (req, res) => {
     try {
-      const { difficulty, specificWord } = req.body;
+      const { difficulty, specificWord, collectionStats } = req.body;
       let targetWord = specificWord?.toUpperCase().replace(/[^A-Z]/g, "");
+
+      const forcedRarity = targetWord ? null : calcForcedRarity(collectionStats);
+
+      // 확률 보정: 최근 같은 등급 연속 수에 따라 낮은 등급 편향
+      const recentRarities = collectionStats?.recentRarities || [];
+      const topRarity = recentRarities[0];
+      const streak = topRarity ? recentRarities.filter((r: string) => r === topRarity).length : 0;
+      const biasHint = !forcedRarity && streak >= 2
+        ? `(참고: 최근 ${streak}연속 ${topRarity} 출현 중 — 자연스러운 밸런스를 위해 낮은 등급 단어를 우선 고려할 것)`
+        : '';
 
       const basePrompt = targetWord
         ? `대상 단어: "${targetWord}" (난이도: ${difficulty})`
-        : `영단어 학습 게임용 ${difficulty} 난이도의 흥미로운 영단어 1개를 직접 선정하라.`;
+        : `영단어 학습 게임용 ${difficulty} 난이도의 흥미로운 영단어 1개를 직접 선정하라. ${biasHint}`;
 
       const instructions = `
 워드 넥서스 세계관 데이터 생성 — 최고 품질 수집형 RPG 기준.
@@ -101,7 +134,7 @@ ${basePrompt}
 • gender: 이 존재의 성별 — 'male'을 기본으로 하되, 단어가 명백히 여성적 뉘앙스(모성·우아함·치유·꽃·미 등)일 때만 예외적으로 'female' 선택. 비율 기준: male 90%, female 10%. 'androgynous'는 사용하지 않음.
 • charDescription: 존재의 기원, 능력, 세계관 속 역할 (3~4문장, 문학적 표현 사용). gender와 weapon 필드와 일관되게 — 선택한 성별 대명사 사용, 무기/아이템을 서사에 자연스럽게 포함. 무기 이름은 반드시 한국어로 번역하여 사용 (영문 그대로 쓰지 말 것). 예) "Crystal-encrusted hoe of eternal growth" → "영원한 성장의 수정 괭이"
 • category: '생명체' | '유물' | '현상' | '공간' | '추상' | '상황' | '관계' 중 선택
-• rarity: Common | Uncommon | Rare | Unique | Epic | Legendary 중 선택
+• rarity: ${forcedRarity ? `반드시 "${forcedRarity}"로 고정 (시스템 천장 규칙 적용 — 다른 값 금지)` : 'Common | Uncommon | Rare | Unique | Epic | Legendary 중 단어의 희귀성·독창성에 맞게 선택'}
 모든 필드는 한국어로 작성 (visualKeywords, gender는 영문). JSON 형식으로 반환.
       `.trim();
 

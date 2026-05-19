@@ -60,11 +60,24 @@ export function GameProvider({ children }: { children: React.ReactNode }) {
 
   const triggerPrefetch = async (mode: string) => {
     if (prefetchCache[mode] || activePrefetches.has(mode)) return;
-    
+
     setActivePrefetches(prev => new Set(prev).add(mode));
     try {
       const { generateWordData } = await import('../services/geminiService');
-      const data = await generateWordData(mode);
+
+      // 수집 통계 계산
+      const rarityCounts: Record<string, number> = {};
+      const recentRarities: string[] = [];
+      userCollection.forEach(c => {
+        rarityCounts[c.rarity] = (rarityCounts[c.rarity] || 0) + (c.count || 1);
+      });
+      // 최근 10판: capturedAt 기준 내림차순
+      [...userCollection]
+        .sort((a, b) => b.capturedAt.getTime() - a.capturedAt.getTime())
+        .slice(0, 10)
+        .forEach(c => recentRarities.push(c.rarity));
+
+      const data = await generateWordData(mode, undefined, false, { rarityCounts, recentRarities });
       setPrefetchCache(prev => ({ ...prev, [mode]: data }));
     } catch (err) {
       console.error("Prefetch failed", err);
