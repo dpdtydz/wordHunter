@@ -2,7 +2,7 @@ import express from "express";
 import path from "path";
 import { createServer as createViteServer } from "vite";
 import { GoogleGenAI, Type } from "@google/genai";
-import { readFileSync, existsSync } from "fs";
+import sharp from "sharp";
 
 const PORT = 3000;
 
@@ -153,8 +153,17 @@ ${basePrompt}
       }
 
       const arrayBuffer = await imgResponse.arrayBuffer();
-      const base64Data = Buffer.from(arrayBuffer).toString("base64");
+      const inputBuffer = Buffer.from(arrayBuffer);
 
+      // 하단 8% 크롭으로 워터마크 제거
+      const meta = await sharp(inputBuffer).metadata();
+      const cropHeight = Math.floor((meta.height || 768) * 0.92);
+      const croppedBuffer = await sharp(inputBuffer)
+        .extract({ left: 0, top: 0, width: meta.width || 512, height: cropHeight })
+        .png()
+        .toBuffer();
+
+      const base64Data = croppedBuffer.toString("base64");
       console.log(`[Nexus Server] Sending base64 image back for ${word}`);
       res.json({ base64: base64Data });
     } catch (error: any) {
