@@ -3,6 +3,7 @@ import { User, onAuthStateChanged, signInWithPopup, signOut } from 'firebase/aut
 import { doc, getDoc, setDoc, updateDoc, collection, getDocs, query, orderBy, limit, serverTimestamp, setDoc as setFirestoreDoc } from 'firebase/firestore';
 import { auth, db, googleProvider, handleFirestoreError, OperationType } from '../lib/firebase';
 import { UserProfile, CapturedCharacter, UserRanking, GameCharacter } from '../types';
+import firebaseConfig from '../../firebase-applet-config.json';
 
 interface GameContextType {
   user: User | null;
@@ -40,7 +41,9 @@ export function GameProvider({ children }: { children: React.ReactNode }) {
         if (res.ok) {
           const data = await res.json();
           const configDbId = (firebaseConfig as any).firestoreDatabaseId;
-          if (data.databaseId === "(default)" && configDbId && configDbId !== "(default)") {
+          const activeDbId = data.activeDatabaseId;
+          
+          if (activeDbId === "(default)" && configDbId && configDbId !== "(default)") {
             console.log("[Nexus] Server using (default) database. Switching client too.");
             const { getApp } = await import('firebase/app');
             const { getFirestore } = await import('firebase/firestore');

@@ -2,73 +2,22 @@ import express from "express";
 import path from "path";
 import { createServer as createViteServer } from "vite";
 import { GoogleGenAI, Type, Modality } from "@google/genai";
-import admin from "firebase-admin";
-import { getFirestore } from "firebase-admin/firestore";
-import { getStorage } from "firebase-admin/storage";
 import { readFileSync, existsSync } from "fs";
 
 const PORT = 3000;
-const CONFIG_PATH = path.join(process.cwd(), 'firebase-applet-config.json');
-
-// Load Firebase Config
-let firebaseConfig: any = {};
-if (existsSync(CONFIG_PATH)) {
-  firebaseConfig = JSON.parse(readFileSync(CONFIG_PATH, 'utf8'));
-}
-
-// Initialize Firebase Admin with explicit Project ID to avoid environment mismatch
-if (!admin.apps.length) {
-  admin.initializeApp({
-    projectId: firebaseConfig.projectId,
-    storageBucket: firebaseConfig.storageBucket,
-  });
-}
-
-const getDatabase = () => {
-  const dbId = firebaseConfig.firestoreDatabaseId;
-  
-  if (!dbId || dbId === "(default)") {
-    console.log("[Firebase] Initializing with (default) database.");
-    return getFirestore(admin.app());
-  }
-
-  try {
-    console.log(`[Firebase] Initializing with custom Database ID: ${dbId}`);
-    return getFirestore(admin.app(), dbId);
-  } catch (e) {
-    console.error(`[Firebase] Failed to initialize Firestore with DB ID ${dbId}. Falling back to (default).`, e);
-    return getFirestore(admin.app());
-  }
-};
-
-let currentDb = getDatabase();
-const storage = getStorage(admin.app());
-
-// Helper to handle Firestore operations with potential DB fallback
-async function runWithDbFallback<T>(op: (db: admin.firestore.Firestore) => Promise<T>): Promise<T> {
-  try {
-    return await op(currentDb);
-  } catch (err: any) {
-    const isCustomDb = firebaseConfig.firestoreDatabaseId && firebaseConfig.firestoreDatabaseId !== "(default)";
-    const isPermissionError = err.message?.includes("PERMISSION_DENIED") || err.message?.includes("7");
-    const isNotFoundError = err.message?.includes("NOT_FOUND") || err.message?.includes("5");
-
-    if (isCustomDb && (isPermissionError || isNotFoundError)) {
-      console.error(`[Firebase] Operation failed on custom DB ${firebaseConfig.firestoreDatabaseId}. One-time fallback to (default)...`, err.message);
-      currentDb = getFirestore(admin.app()); // Permanent switch for this process
-      return await op(currentDb);
-    }
-    throw err;
-  }
-}
 
 async function startServer() {
   const expressApp = express();
   expressApp.use(express.json());
 
-  const ai = new GoogleGenAI({ 
+  const ai = new GoogleGenAI({
     apiKey: process.env.GEMINI_API_KEY || "",
     httpOptions: { headers: { 'User-Agent': 'aistudio-build' } }
+  });
+  
+  const aiImage = new GoogleGenAI({
+    apiKey: process.env.GEMINI_API_KEY || "",
+    httpOptions: { apiVersion: "v1beta", headers: { 'User-Agent': 'aistudio-build' } }
   });
 
   const SYSTEM_INSTRUCTION = `당신은 세계적인 수집형 판타지 RPG "워드 넥서스"의 수석 세계관 설계자입니다.
@@ -93,12 +42,10 @@ async function startServer() {
     Legendary: "Transcendent masterpiece. Cosmic or divine scale. Reality fractures behind the character. Every pixel must feel inevitable and awe-inspiring. This is the pinnacle visual expression of the concept.",
   };
 
-  // Model fallback chain for text generation
   const TEXT_MODELS = [
-    "gemini-2.0-flash",
-    "gemini-1.5-flash",
-    "gemini-1.5-flash-8b",
-    "gemini-2.0-flash-lite-preview-02-05"
+    "gemini-3-flash-preview",
+    "gemini-flash-latest",
+    "gemini-3.1-flash-lite",
   ];
 
   async function generateWithFallback(instructions: string, schema: any) {
@@ -119,11 +66,7 @@ async function startServer() {
       } catch (err: any) {
         lastError = err;
         console.warn(`[Nexus Server] Model ${modelName} failed: ${err.message}`);
-        if (err.message?.includes("429") || err.message?.includes("RESOURCE_EXHAUSTED")) {
-          continue; // Try next model on quota error
-        }
-        // If it's a structural error (schema validation etc), maybe don't fallback? 
-        // But usually best to try another model anyway.
+        continue;
       }
     }
     throw lastError || new Error("All text models failed");
@@ -132,37 +75,17 @@ async function startServer() {
   // API Routes
   expressApp.get("/api/health", async (req, res) => {
     try {
-      // Test read to check connectivity
-      const snap = await runWithDbFallback(db => db.collection("global_vault").limit(1).get());
-      res.json({ 
-        status: "ok", 
-        databaseId: firebaseConfig.firestoreDatabaseId || "(default)",
-        projectId: firebaseConfig.projectId,
-        count: snap.size
-      });
+      res.json({ status: "ok", initializedAt: new Date().toISOString() });
     } catch (e: any) {
       console.error("[Health Check] Failure:", e);
-      res.status(500).json({ status: "error", error: e.message, details: e.stack });
+      res.status(500).json({ status: "error", error: e.message, code: e.code });
     }
   });
 
   expressApp.post("/api/generate-word", async (req, res) => {
     try {
-      const { difficulty, specificWord, forceRefresh } = req.body;
-
+      const { difficulty, specificWord } = req.body;
       let targetWord = specificWord?.toUpperCase().replace(/[^A-Z]/g, "");
-
-      if (targetWord && !forceRefresh) {
-        try {
-          const snap = await runWithDbFallback(db => db.collection("global_vault").doc(targetWord).get());
-          if (snap.exists) {
-            console.log(`[Nexus Server] Vault hit: ${targetWord}`);
-            return res.json(snap.data());
-          }
-        } catch (e: any) {
-          console.warn(`[Nexus Server] Vault check error for ${targetWord}: ${e.message}`);
-        }
-      }
 
       const basePrompt = targetWord
         ? `대상 단어: "${targetWord}" (난이도: ${difficulty})`
@@ -202,27 +125,10 @@ ${basePrompt}
       };
 
       const resultText = await generateWithFallback(instructions, schema);
-
       const result = JSON.parse(resultText.text);
       result.word = result.word.toUpperCase().replace(/[^A-Z]/g, "");
       result.visualEmoji = result.visualKeywords;
       result.imageUrl = "";
-
-      // Persist
-      try {
-        const docId = result.word;
-        console.log(`[Nexus Server] Persisting ${docId} to project ${firebaseConfig.projectId}...`);
-        await runWithDbFallback(db => db.collection("global_vault").doc(docId).set({
-          ...result,
-          id: docId,
-          name: result.characterName,
-          description: result.charDescription,
-          updatedAt: admin.firestore.FieldValue.serverTimestamp(),
-        }, { merge: true }));
-        console.log(`[Nexus Server] Persisted ${docId}`);
-      } catch (err: any) {
-        console.error(`[Nexus Server] Persistence error ${result.word}: ${err.message}`);
-      }
 
       res.json(result);
     } catch (error: any) {
@@ -233,22 +139,7 @@ ${basePrompt}
 
   expressApp.post("/api/generate-image", async (req, res) => {
     try {
-      const { word, name, description, rarity, visualKeywords, wordKorean, forceRefresh } = req.body;
-      const bucket = storage.bucket();
-      const filename = `characters/${word.toUpperCase()}.png`;
-      const file = bucket.file(filename);
-
-      if (!forceRefresh) {
-        try {
-          const [exists] = await file.exists();
-          if (exists) {
-            try { await file.makePublic(); } catch (e) {}
-            // Use publicUrl() if possible, else construct manually
-            const url = `https://storage.googleapis.com/${bucket.name}/${filename}`;
-            return res.json({ imageUrl: url });
-          }
-        } catch (e) {}
-      }
+      const { word, name, description, rarity, visualKeywords } = req.body;
 
       const rarityArt = (RARITY_ART_DIRECTION as any)[rarity] || RARITY_ART_DIRECTION.Common;
       const rarityLore = (RARITY_LORE as any)[rarity] || RARITY_LORE.Common;
@@ -264,19 +155,17 @@ Detailed anime fantasy style, cinematic lighting, 4k resolution. No text, no fra
       `.trim();
 
       const IMAGE_MODELS = [
-        "gemini-2.0-flash", // 2.0 Flash is generally stable for image gen now
         "gemini-2.5-flash-image",
         "gemini-3.1-flash-image-preview",
-        "gemini-2.0-flash-exp"
       ];
 
-      let imageData: Buffer | null = null;
+      let base64Data: string | null = null;
       let lastErr: any;
 
       for (const modelName of IMAGE_MODELS) {
         try {
-          console.log(`[Nexus Server] Trying image gen: ${modelName}`);
-          const response = await ai.models.generateContent({
+          console.log(`[Nexus Server] Trying image gen with ${modelName}`);
+          const response = await aiImage.models.generateContent({
             model: modelName,
             contents: imagePrompt,
             config: {
@@ -288,51 +177,34 @@ Detailed anime fantasy style, cinematic lighting, 4k resolution. No text, no fra
           if (parts) {
             for (const part of parts) {
               if (part.inlineData?.data) {
-                imageData = Buffer.from(part.inlineData.data, 'base64');
+                base64Data = part.inlineData.data;
                 break;
               }
             }
           }
-          if (imageData) break;
+          if (base64Data) break;
         } catch (err: any) {
           lastErr = err;
           console.warn(`[Nexus Server] ${modelName} failed: ${err.message}`);
-          if (err.message?.includes("429")) continue;
-          // Some models might not support IMAGE modality, continue to next
+          continue;
         }
       }
 
-      if (!imageData) {
+      if (!base64Data) {
         throw lastErr || new Error("Image generation failed");
       }
 
-      console.log(`[Nexus Server] Storing image for ${word}`);
-      await file.save(imageData, { contentType: "image/png", metadata: { cacheControl: "public, max-age=31536000" } });
-      try { await file.makePublic(); } catch (e) {}
-      const downloadUrl = `https://storage.googleapis.com/${bucket.name}/${filename}`;
+      console.log(`[Nexus Server] Sending base64 image back for ${word}`);
 
-      try {
-        await runWithDbFallback(db => db.collection("global_vault").doc(word.toUpperCase()).set({
-          imageUrl: downloadUrl,
-          updatedAt: admin.firestore.FieldValue.serverTimestamp(),
-        }, { merge: true }));
-      } catch (e: any) {
-        console.error(`[Nexus Server] Failed to update vault for ${word} after image gen: ${e.message}`);
-      }
-
-      res.json({ imageUrl: downloadUrl });
+      res.json({ base64: base64Data });
     } catch (error: any) {
       console.error("[Nexus Server] Image gen failed:", error);
       res.status(500).json({ error: error.message });
     }
   });
 
-  // Vite Middleware
   if (process.env.NODE_ENV !== "production") {
-    const vite = await createViteServer({
-      server: { middlewareMode: true },
-      appType: "spa",
-    });
+    const vite = await createViteServer({ server: { middlewareMode: true }, appType: "spa" });
     expressApp.use(vite.middlewares);
   } else {
     const distPath = path.join(process.cwd(), 'dist');
@@ -349,6 +221,6 @@ Detailed anime fantasy style, cinematic lighting, 4k resolution. No text, no fra
 }
 
 startServer().catch(err => {
-  console.error("Critical server startup failure:", err);
+  console.error("Critical server failure:", err);
   process.exit(1);
 });
