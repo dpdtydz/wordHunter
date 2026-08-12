@@ -1,7 +1,7 @@
 # ✨ Word Nexus (워드 넥서스)
 > **Gemini AI 기반 수집형 행맨(Hangman) 단어 퍼즐 & 도감 수집 게임**
 
-![Word Nexus Banner](src/assets/images/nexus_background_1778828746842.png)
+![Word Nexus UI Showcase](src/assets/images/word_nexus_ui_mockup.svg)
 
 [![React](https://img.shields.io/badge/React-18.3.1-61DAFB?style=for-the-badge&logo=react&logoColor=black)](https://react.dev/)
 [![TypeScript](https://img.shields.io/badge/TypeScript-5.5.3-3178C6?style=for-the-badge&logo=typescript&logoColor=white)](https://www.typescriptlang.org/)
@@ -19,27 +19,89 @@
 
 ---
 
-## 📱 주요 화면 및 UI 미리보기 (UI & Gameplay Showcase)
+## 📱 주요 화면 & Code Mockup 프리뷰 (UI & Gameplay Showcase)
 
-```
-+-----------------------------------------------------------------------+
-|  ✨ WORD NEXUS | 🏆 레벨 12 (EXP 68%) | 🪙 1,450 Gold | 📚 도감 48/120  |
-+-----------------------------------------------------------------------+
-|                                                                       |
-|   +--------------------------+   +---------------------------------+  |
-|   |  🌌 [Legendary] SHINY    |   |  🎯 GUESS THE WORD              |  |
-|   |  "ASTRANOMOUS DRAGON"    |   |  Category: [생명체 / Rare]       |  |
-|   |                          |   |  Hint: 'A stellar leviathan...' |  |
-|   |  [ AI Character Art ]    |   |                                 |  |
-|   |                          |   |  _  A  S  T  R  O  _  _  _  _   |  |
-|   +--------------------------+   +---------------------------------+  |
-|                                                                       |
-|   +---------------------------------------------------------------+   |
-|   |  ⌨️ LETTER KEYBOARD (HP: ♥♥♥♥♥♡)                               |   |
-|   |  [A] [B] [C] [D] [E] [F] [G] [H] [I] [J] [K] [L] [M]          |   |
-|   |  [N] [O] [P] [Q] [R] [S] [T] [U] [V] [W] [X] [Y] [Z]          |   |
-|   +---------------------------------------------------------------+   |
-+-----------------------------------------------------------------------+
+### 🖼️ Vector SVG UI 프리뷰
+![Word Nexus Interactive Board](src/assets/images/word_nexus_ui_mockup.svg)
+
+### 💻 실제 사용 화면 Code Mockup Structure
+
+```tsx
+/* Word Nexus Main Gameplay Layout Mockup */
+<div className="min-h-screen bg-slate-950 text-slate-100 font-sans">
+  {/* Top HUD Status Bar */}
+  <header className="flex items-center justify-between border-b border-slate-800 px-6 py-3">
+    <div className="flex items-center gap-3">
+      <h1 className="text-xl font-extrabold tracking-widest text-indigo-400">WORD<span className="text-white">NEXUS</span></h1>
+      <span className="rounded-full bg-emerald-950/80 stroke-emerald-500 px-3 py-1 text-xs font-bold text-emerald-400 border border-emerald-800">
+        🌾 FARMING MODE
+      </span>
+    </div>
+    <div className="flex items-center gap-4 text-sm font-semibold">
+      <div className="rounded-lg bg-slate-900 border border-slate-800 px-3 py-1.5 text-amber-400">🏆 Lv. 12 (EXP 68%)</div>
+      <div className="rounded-lg bg-slate-900 border border-slate-800 px-3 py-1.5 text-yellow-300">🪙 1,450 Gold</div>
+      <div className="rounded-lg bg-slate-900 border border-slate-800 px-3 py-1.5 text-purple-300">📚 Collection 48 / 120</div>
+    </div>
+  </header>
+
+  {/* Main Interactive Grid */}
+  <main className="grid grid-cols-12 gap-6 p-6 max-w-7xl mx-auto">
+    {/* Left Column: Gemini AI Holographic Character Soul Card */}
+    <div className="col-span-12 lg:col-span-4 flex flex-col items-center">
+      <div className="relative w-full aspect-[3/4] rounded-2xl p-1 bg-gradient-to-br from-pink-500 via-purple-500 to-indigo-500 shadow-2xl shadow-purple-500/20">
+        <div className="w-full h-full bg-slate-900 rounded-[14px] p-4 flex flex-col justify-between">
+          <div className="flex justify-between items-center">
+            <span className="bg-amber-400 text-slate-950 font-black text-xs px-2.5 py-1 rounded-full shadow">✨ SHINY</span>
+            <span className="bg-rose-950 text-rose-300 font-bold text-xs px-2.5 py-1 rounded-full border border-rose-800">LEGENDARY</span>
+          </div>
+          <div className="my-auto text-center">
+            <img src="/api/character-art/astronomer" alt="ASTRONOMER" className="w-48 h-48 mx-auto rounded-xl border border-purple-500/30 object-cover shadow-lg" />
+            <h3 className="mt-4 text-xl font-black text-amber-300 tracking-wider">ASTRONOMER</h3>
+            <p className="text-xs text-emerald-400 font-medium">천문학자 · 별의 관측자</p>
+          </div>
+          <div className="bg-slate-950/80 rounded-xl p-3 border border-purple-900/50 text-xs text-slate-400">
+            <p className="italic">"밤하늘의 별자리 속에 감춰진 고대 문명을 관측한다."</p>
+          </div>
+        </div>
+      </div>
+    </div>
+
+    {/* Right Column: Interactive Hangman Game Board */}
+    <div className="col-span-12 lg:col-span-8 flex flex-col gap-6">
+      {/* Category & AI Hint Box */}
+      <div className="bg-slate-900/90 rounded-2xl p-5 border border-slate-800 shadow-xl">
+        <div className="flex justify-between items-center mb-2">
+          <span className="text-xs font-extrabold text-indigo-400 tracking-wider uppercase">CATEGORY: 생명체 & 지식인</span>
+          <span className="text-xs font-bold text-emerald-400 bg-emerald-950 px-3 py-1 rounded-md border border-emerald-800">CHANCES: ♥♥♥♥♥</span>
+        </div>
+        <p className="text-slate-200 text-sm font-medium">AI HINT: "A scientist who studies stars, planets, and celestial bodies in space."</p>
+        <p className="text-slate-400 text-xs mt-1">한글 뜻: 별과 우주를 연구하고 별자리의 운명을 읽어내는 학자</p>
+      </div>
+
+      {/* Letter Slots */}
+      <div className="flex justify-center gap-2 my-4">
+        {['A','S','T','R','O','N','O','_','_','R'].map((char, i) => (
+          <div key={i} className={`w-11 h-14 rounded-xl flex items-center justify-center font-black text-2xl border-2 ${
+            char !== '_' ? 'bg-slate-800 border-emerald-500 text-emerald-400 shadow-lg shadow-emerald-500/10' : 'bg-slate-950 border-indigo-500/50 text-indigo-400 animate-pulse'
+          }`}>
+            {char !== '_' ? char : ''}
+          </div>
+        ))}
+      </div>
+
+      {/* Interactive Virtual Keyboard */}
+      <div className="bg-slate-900/80 rounded-2xl p-5 border border-slate-800">
+        <div className="grid grid-cols-10 gap-1.5">
+          {['Q','W','E','R','T','Y','U','I','O','P','A','S','D','F','G','H','J','K','L','Z','X','C','V','B','N','M'].map((key) => (
+            <button key={key} className="h-11 rounded-lg font-bold text-sm bg-slate-800 text-slate-200 hover:bg-indigo-600 active:scale-95 transition-all">
+              {key}
+            </button>
+          ))}
+        </div>
+      </div>
+    </div>
+  </main>
+</div>
 ```
 
 ### 🎮 핵심 게임 기능 (Key Features)
