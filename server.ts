@@ -3,6 +3,7 @@ import path from "path";
 import { createServer as createViteServer } from "vite";
 import { GoogleGenAI, Type } from "@google/genai";
 import sharp from "sharp";
+import firebaseConfig from "./firebase-applet-config.json" assert { type: "json" };
 
 const PORT = 3000;
 
@@ -38,9 +39,10 @@ async function startServer() {
   };
 
   const TEXT_MODELS = [
-    "gemini-3-flash-preview",
     "gemini-flash-latest",
+    "gemini-2.0-flash-exp",
     "gemini-3.1-flash-lite",
+    "gemini-3-flash-preview",
   ];
 
   async function generateWithFallback(instructions: string, schema: any) {
@@ -70,7 +72,13 @@ async function startServer() {
   // API Routes
   expressApp.get("/api/health", async (req, res) => {
     try {
-      res.json({ status: "ok", initializedAt: new Date().toISOString() });
+      const dbInfo = (firebaseConfig as any);
+      res.json({ 
+        status: "ok", 
+        initializedAt: new Date().toISOString(),
+        hasApiKey: !!process.env.GEMINI_API_KEY,
+        activeDatabaseId: dbInfo.firestoreDatabaseId || "(default)"
+      });
     } catch (e: any) {
       console.error("[Health Check] Failure:", e);
       res.status(500).json({ status: "error", error: e.message, code: e.code });
@@ -176,13 +184,26 @@ ${basePrompt}
       const rarityArt = (RARITY_ART_DIRECTION as any)[rarity] || RARITY_ART_DIRECTION.Common;
 
       const genderTag = gender === 'female' ? '1girl, female character,' : '1boy, male character,';
-      const weaponTag = weapon ? `Weapon clearly visible in hand: ${weapon}.` : '';
-      const conceptLine = `This character IS the living embodiment of "${word}" (${wordKorean}). A viewer must instantly think of "${word}" just by looking at this character.`;
-      const visualLine = `Required visual elements on costume, body, and background: ${visualKeywords}. These are NON-NEGOTIABLE — every element must be present.`;
+      const weaponTag = weapon ? `WEAPON (must be clearly held in hand, most prominent element): ${weapon}.` : 'no weapon.';
+      const conceptLine = `Character concept: "${word}". Every visual detail must make a viewer instantly think of "${word}".`;
+      const visualLine = `Costume and body MUST show all of these: ${visualKeywords}.`;
 
-      const imagePrompt = `2D anime illustration, cel shading, korean mobile RPG style, half-body portrait. ${genderTag} ${conceptLine} ${visualLine} ${weaponTag} ${rarityArt} Simple gradient background, strong rim lighting.`;
+      // description에서 영어 시각 키워드만 Gemini로 추출 (한국어 원문을 프롬프트에 직접 넣으면 한자 렌더링 발생)
+      let loreVisuals = '';
+      if (description) {
+        try {
+          const extractRes = await generateWithFallback(
+            `Extract only concrete visual elements from this character description as a short English comma-separated list (body markings, aura color, environment, clothing details). Max 15 words total. Description: "${description}"`,
+            { type: Type.STRING }
+          );
+          const extracted = extractRes.text?.trim().replace(/\n/g, ' ') || '';
+          if (extracted) loreVisuals = `Additional visual details from lore: ${extracted}.`;
+        } catch (_) { /* 추출 실패 시 무시 */ }
+      }
 
-      const negativePrompt = "text, watermark, signature, logo, letters, words, typography, glyphs, subtitles, UI, HUD, frames, borders, bad anatomy, deformed, ugly, blurry, low quality";
+      const imagePrompt = `2D anime illustration, cel shading, korean mobile RPG style, half-body portrait. ${genderTag} ${conceptLine} ${visualLine} ${weaponTag} ${loreVisuals} ${rarityArt} Strong rim lighting, pure color gradient background.`;
+
+      const negativePrompt = "text, letters, words, glyphs, chinese characters, japanese characters, korean characters, typography, watermark, signature, logo, subtitles, UI, HUD, frames, borders, bad anatomy, deformed, ugly, blurry, low quality";
 
       const HF_PROVIDERS = [
         {

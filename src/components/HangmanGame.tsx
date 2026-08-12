@@ -3,7 +3,7 @@ import { motion, AnimatePresence } from 'motion/react';
 import { useGame } from '../context/GameContext';
 import { generateWordData, GeneratedWord } from '../services/geminiService';
 import { Rarity, GameCharacter } from '../types';
-import { Trophy, RefreshCw, XCircle, Sparkles } from 'lucide-react';
+import { Trophy, RefreshCw, XCircle, Sparkles, HelpCircle, X } from 'lucide-react';
 import { cn } from '../lib/utils';
 import { getRarityBorder, getRarityColor } from '../lib/gameUtils';
 
@@ -29,8 +29,8 @@ export default function HangmanGame({ mode, onExit }: HangmanGameProps) {
   const maxMistakes = 6;
 
   const [showRetry, setShowRetry] = useState(false);
-
   const [resImgError, setResImgError] = useState(false);
+  const [showGuide, setShowGuide] = useState(false);
 
   const initGame = useCallback(async () => {
     setGuessedLetters([]);
@@ -202,12 +202,76 @@ export default function HangmanGame({ mode, onExit }: HangmanGameProps) {
 
   return (
     <div className="max-w-4xl mx-auto py-8 px-4">
-      <div className="flex justify-between items-center mb-8">
+      <div className="flex justify-between items-center mb-4">
         <div className="px-4 py-1 rounded-full bg-brand-gray border border-white/10 text-xs font-mono uppercase tracking-widest text-brand-cyan">
           {mode === 'Farming' ? '파밍' : '도전'} 구역
         </div>
-        <button onClick={onExit} className="text-gray-500 hover:text-white transition-colors">나가기</button>
+        <div className="flex items-center gap-3">
+          <button
+            onClick={() => setShowGuide(v => !v)}
+            className="flex items-center gap-1.5 text-xs text-brand-cyan/60 hover:text-brand-cyan border border-brand-cyan/20 hover:border-brand-cyan/50 px-3 py-1 rounded-full transition-all"
+          >
+            <HelpCircle size={13} />
+            게임 가이드
+          </button>
+          <button onClick={onExit} className="text-gray-500 hover:text-white transition-colors text-sm">나가기</button>
+        </div>
       </div>
+
+      {/* 게임 가이드 패널 */}
+      <AnimatePresence>
+        {showGuide && (
+          <motion.div
+            initial={{ opacity: 0, height: 0 }}
+            animate={{ opacity: 1, height: 'auto' }}
+            exit={{ opacity: 0, height: 0 }}
+            className="overflow-hidden mb-6"
+          >
+            <div className="glass-card border border-brand-cyan/20 rounded-2xl p-5 text-xs font-mono grid grid-cols-1 md:grid-cols-3 gap-5">
+              <button onClick={() => setShowGuide(false)} className="absolute top-3 right-3 text-gray-600 hover:text-white md:hidden"><X size={14} /></button>
+
+              {/* 포획 확률 */}
+              <div>
+                <p className="text-brand-cyan uppercase tracking-widest mb-2 font-bold text-[10px]">◆ 포획 확률</p>
+                <ul className="space-y-1.5 text-gray-400 leading-relaxed">
+                  <li>· 게임 시작 시 <span className="text-brand-cyan">100%</span></li>
+                  <li>· 정답 알파벳 입력 시 <span className="text-yellow-400">-2%</span></li>
+                  <li>· 오답 알파벳 입력 시 <span className="text-red-400">-15%</span></li>
+                  <li>· 핵심 의미 공개 시 <span className="text-red-400">-15%</span></li>
+                  <li>· 최소값 <span className="text-red-400">10%</span> (포획은 항상 가능)</li>
+                </ul>
+                <p className="text-gray-600 mt-2 leading-relaxed">포획 확률이 높을수록<br/>더 많은 경험치를 획득</p>
+              </div>
+
+              {/* 경험치 & 승급 */}
+              <div>
+                <p className="text-brand-purple uppercase tracking-widest mb-2 font-bold text-[10px]">◆ 경험치 & 승급</p>
+                <ul className="space-y-1.5 text-gray-400 leading-relaxed">
+                  <li>· Common <span className="text-white">+10 EXP</span></li>
+                  <li>· Uncommon <span className="text-green-400">+25 EXP</span></li>
+                  <li>· Rare <span className="text-blue-400">+50 EXP</span></li>
+                  <li>· Unique <span className="text-purple-400">+100 EXP</span></li>
+                  <li>· Epic <span className="text-yellow-400">+200 EXP</span></li>
+                  <li>· Legendary <span className="text-orange-400">+500 EXP</span></li>
+                </ul>
+                <p className="text-gray-600 mt-2 leading-relaxed">최종 EXP = 기본값 × (포획률/100)<br/>레벨업: 100 EXP마다 1레벨</p>
+              </div>
+
+              {/* 희귀도 & 천장 */}
+              <div>
+                <p className="text-yellow-400 uppercase tracking-widest mb-2 font-bold text-[10px]">◆ 희귀도 & 천장</p>
+                <ul className="space-y-1.5 text-gray-400 leading-relaxed">
+                  <li>· 희귀도는 단어 난이도로 결정</li>
+                  <li>· 같은 등급 <span className="text-white">4연속</span> 시<br/><span className="text-brand-cyan">한 단계 아래 등급 확정</span></li>
+                  <li>· 2연속부터 낮은 등급<br/>확률 자동 보정</li>
+                  <li>· {mode === 'Challenge' ? <span>도전 구역: 힌트 사용 시<br/><span className="text-red-400">실수 +1 추가</span></span> : <span>파밍 구역: 힌트 패널티<br/><span className="text-yellow-400">확률 감소만</span></span>}</li>
+                </ul>
+                <p className="text-gray-600 mt-2 leading-relaxed">중복 포획 시: <span className="text-yellow-400">+50 코인</span><br/>중복 카운트는 도감에 표시</p>
+              </div>
+            </div>
+          </motion.div>
+        )}
+      </AnimatePresence>
 
       <div className="grid grid-cols-1 lg:grid-cols-2 gap-12 items-center mb-12">
         <div className="relative flex justify-center items-center h-64 glass-card bg-brand-dark/80 overflow-hidden border-white/20">
